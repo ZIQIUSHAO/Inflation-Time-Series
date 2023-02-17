@@ -1,0 +1,537 @@
+---
+title: "Exploratory Data Analysis"
+editor: visual
+
+---
+
+icon: github
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(forecast)
+library(astsa) 
+library(xts)
+library(tseries)
+library(fpp2)
+library(fma)
+library(lubridate)
+library(tidyverse)
+library(TSstudio)
+library(quantmod)
+library(tidyquant)
+library(plotly)
+library(ggplot2)
+require(gridExtra)
+```
+
+## 1. Visualize time series plot to identify the components
+
+
+### 1.1 Inflation
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+us.cpi.if <- read.csv('data/us_cpi_if.csv')
+cn.cpi.if <- read.csv('data/cn_cpi_if.csv')
+cn.gdp <- read.csv('data/cn_current_gdp.csv')
+us.gdp <- read.csv('data/us_gdp.csv')
+us.pce.if <- read.csv('data/us_pce_if.csv')
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+cpi <- data.frame(as.Date(us.cpi.if$Date),us.cpi.if$CPI,cn.cpi.if$CPI)
+cpi <- na.omit(cpi)
+names(cpi) <- c('date','us.if','cn.if')
+gdp <- data.frame(as.Date(cn.gdp$date),cn.gdp$GDP,us.gdp$GDP)
+names(gdp) <- c('date','cn.gdp','us.gdp')
+# cpi
+# gdp
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+us.cpi.if <- na.omit(us.cpi.if)
+us.pce.if <- na.omit(us.pce.if)
+```
+
+The following pic is showing annualized quarterly inflation rates for various price indexes using data from 2003 to 2022.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+fig <- plot_ly()%>%
+  add_lines(x=as.Date(us.cpi.if$Date),y = us.cpi.if$Inflation, name = "CPI Inflation")%>%
+  add_lines(x=as.Date(us.pce.if$date),y = us.pce.if$Inflation, name = "PCE Inflation",line = list(color= 'black', widthh=0.5))%>%
+  layout(title = 'US Inflation Indicators from 2003 to 2022',
+         xaxis = list(title = 'Date'),
+         yaxis = list( title = 'Inflation'))
+
+fig
+```
+
+
+Inflation does not exhibit a uniform trend, often fluctuating up and down, and displaying limited seasonality. However, there appears to be a degree of periodicity to it. 
+
+So to better understand the trend, I took it a step further by applying moving average smoothing and plotting them at different time intervals to show the movement in the data. The moving average plot shows a generally positive trend in the last one. Other charts show that inflation can be viewed as consistently positive simply because good inflation stimulates the economy and the Federal Bank keeps inflation under control.
+
+
+#### Moving Average Smoothing
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+if.us.cpi<-ts(us.cpi.if$Inflation,star=decimal_date(as.Date("2003-01-01",format = "%Y-%m-%d")),frequency = 12)
+ma3 <- autoplot(if.us.cpi, series="Data") +
+  autolayer(ma(if.us.cpi,3), series="3-MA") +
+  xlab("Year") + ylab("%") +
+  ggtitle("US CPI Inflation") +
+  scale_colour_manual(values=c("Data"="grey50","3-MA"="red"),
+                      breaks=c("Data","3-MA"))
+
+ma5 <- autoplot(if.us.cpi, series="Data") +
+  autolayer(ma(if.us.cpi,7), series="7-MA") +
+  xlab("Year") + ylab("%") +
+  ggtitle("US CPI Inflation") +
+  scale_colour_manual(values=c("Data"="grey50","7-MA"="red"),
+                      breaks=c("Data","7-MA"))
+
+
+ma7 <- autoplot(if.us.cpi, series="Data") +
+  autolayer(ma(if.us.cpi,15), series="15-MA") +
+  xlab("Year") + ylab("%") +
+  ggtitle("US CPI Inflation") +
+  scale_colour_manual(values=c("Data"="grey50","15-MA"="red"),
+                      breaks=c("Data","15-MA"))
+
+ma9 <- autoplot(if.us.cpi, series="Data") +
+  autolayer(ma(if.us.cpi,51), series="51-MA") +
+  xlab("Year") + ylab("%") +
+  ggtitle("US CPI Inflation") +
+  scale_colour_manual(values=c("Data"="grey50","51-MA"="red"),
+                      breaks=c("Data","51-MA"))
+
+grid.arrange(ma3, ma5,ma7,ma9, nrow = 2, ncol=2)
+
+```
+
+
+### 1.2 CPI
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+df <- cpi %>%
+  select(date, us.if, cn.if) %>%
+  gather(key = "variable", value = "value", -date)
+ggplot(df, aes(x = date, y = value)) + 
+  geom_line(aes(color = variable), size=0.6) + 
+  scale_color_manual(labels = c("China", "United States"),values = c("darkred", "steelblue"))+
+  guides(color=guide_legend("Country"))+
+  labs(title="CPI from 2003 to 2022", x="Date", y="CPI Index")+
+   scale_x_date(date_labels = "%Y-%m")
+```
+
+As indicated in the Data Visualization tab, the two countries cannot be compared directly due to their distinct base period setting cycles. Consumer spending in the US exhibits a steady upward trend, whereas in China, it appears to fluctuate periodically.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(cpi, aes(x=date)) +
+  geom_line(aes(y = cn.if), color="darkred", size=0.6)+
+   scale_x_date(date_labels = "%Y-%m")+ylab("CPI")+
+  ggtitle('China CPI from 2002 to 2022')
+
+```
+
+### 1.3 GDP
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+df <- gdp %>%
+  select(date, us.gdp, cn.gdp) %>%
+  gather(key = "variable", value = "value", -date)
+ggplot(df, aes(x = date, y = value)) + 
+  geom_line(aes(color = variable), size=0.6) + 
+  scale_color_manual(labels = c("China", "United States"),values = c("darkred", "steelblue"))+
+  guides(color=guide_legend("Country"))+
+  labs(title="GDP from 2002 to 2022", x="Date", y="Inflation Index")+
+   scale_x_date(date_labels = "%Y-%m")+ facet_wrap(~variable, nrow =  2)
+
+
+```
+
+Over the past 20 years, it has become evident that China's GDP growth has outpaced that of the United States on a seasonal basis. While the United States has also experienced positive growth, it has been at a slower but consistent rate.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+p2 <-  ggplot(gdp, aes(x=date)) +
+  geom_line(aes(y = us.gdp), color="steelblue", size=0.6)+
+   scale_x_date(date_labels = "%Y-%m")+ylab("GDP")+
+  ggtitle('United Sates GDP from 2002 to 2022')
+
+p2
+```
+
+
+## 2. Inflation Exploring
+
+### 2.1 Lag Plots
+
+A lag plot is a form of scatter plot that displays time series data plotted against itself, either a few time units behind or ahead. Lag plots are useful in uncovering seasonality in the data, identifying any randomness, and detecting autocorrelation. 
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+if.us.cpi<-ts(us.cpi.if$Inflation,star=decimal_date(as.Date("2003-01-01",format = "%Y-%m-%d")),frequency = 12)
+if.us.pce<-ts(us.pce.if$Inflation,star=decimal_date(as.Date("2003-01-01",format = "%Y-%m-%d")),frequency = 4)
+
+gglagplot(if.us.cpi, do.lines=FALSE) +xlab("Lags")+ylab("Yt")+ggtitle("Lag Plot for US Monthly CPI Inflation From 2003")
+```
+
+The CPI Inflation lag plot reveals a correlation between the first and second lags, but as the number of lags increases, the plots indicate a lack of correlation. This observation appears to support the hypothesis of the limited seasonality in the time series plot. The lag chart of PCE inflation shows only a weak correlation even in the first chart.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+gglagplot(if.us.pce, do.lines=FALSE) +xlab("Lags")+ylab("Yt")+ggtitle("Lag Plot for US Quarterly PCE Inflation From 2003")
+```
+
+
+### 2.2 Decomposition
+
+
+#### CPI Inflation
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+decompose_if_us_cpi = decompose(if.us.cpi, "additive")
+autoplot(decompose_if_us_cpi)
+```
+
+
+
+#### PCE Inflation
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+decompose_if_us_pce = decompose(if.us.pce, "additive")
+autoplot(decompose_if_us_pce)
+```
+
+When you look at the graph breaking down the time series, it's clear that both types of inflation are trending upward.
+
+### 2.3 ACF and PACF plots
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+plot1<-ggAcf(if.us.cpi) +ggtitle("ACF Plot for US Monthly CPI Inflation from 2003")
+
+plot2<- ggPacf(if.us.cpi)+ggtitle("PACF Plot for US Monthly CPI Inflation from 2003")
+
+grid.arrange(plot1, plot2,nrow=2)
+
+```
+
+
+The ACF plot provides valuable insights into the data. With a slow decay, the plot suggests that future values are strongly correlated with past values. Meanwhile, the PACF plot displays notable correlations at the first lag, followed by a lack of significant correlations. These observations indicate the presence of an autoregressive term in the data. Additionally, the ACF plot suggests that the time series is non-stationary, as demonstrated by the bars in the chart frequently falling outside the blue dashed lines.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+plot1<-ggAcf(if.us.pce) +ggtitle("ACF Plot for US Monthly PCE Inflation from 2003")
+
+plot2<- ggPacf(if.us.pce)+ggtitle("PACF Plot for US Monthly PCE Inflation from 2003")
+
+grid.arrange(plot1, plot2,nrow=2)
+
+```
+
+
+### 2.4 Augmented Dickey-Fuller Test
+
+
+#### CPI Inflation
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+adf.test(if.us.cpi)      # ADF test
+```
+
+P-value is greater than 0.05. We don’t have enough evidence to reject the null hypothesis at 5% significance level. So obviously the series in not stationary for both Inflation series.
+
+#### PCE Inflation
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+adf.test(if.us.pce)      # ADF test
+```
+
+
+
+### 2.5 Differencing Data and Compare Stationarity
+
+Finally, to make the time series stationary, correlations should be removed. You can see that after the first order of difference, the series is stationary.
+
+#### CPI Inflation
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+plot1 <- if.us.cpi %>% diff()  %>% autoplot(main="using diff() function") 
+plot2 <- ggAcf(diff(if.us.cpi), main="first differenced data") 
+plot3 <- autoplot(if.us.cpi, main="Original")
+plot4 <- ggAcf(if.us.cpi, main="Original")
+grid.arrange(plot3, plot4,plot1,plot2,nrow=2,ncol=2)
+
+```
+
+
+#### PCE Inflation
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+plot1 <- if.us.pce %>% diff()  %>% autoplot(main="using diff() function") 
+plot2 <- ggAcf(diff(if.us.pce), main="first differenced data") 
+plot3 <- autoplot(if.us.pce, main="Original")
+plot4 <- ggAcf(if.us.pce, main="Original")
+grid.arrange(plot3, plot4,plot1,plot2,nrow=2,ncol=2)
+
+```
+
+
+## 3. Consumer Price Index Exploring
+
+### 3.1 Lag Plots
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+inflation.us<-ts(cpi$us.if,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+inflation.cn<-ts(cpi$cn.if,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+
+gglagplot(inflation.us, do.lines=FALSE) +xlab("Lags")+ylab("Yt")+ggtitle("Lag Plot for US Monthly CPI From 2003")
+```
+
+The plots of all US CPI lag data indicate that the time series is not random and displays a robust autocorrelation between the lag and former data. These findings suggest that models incorporating autocorrelation may be appropriate for analyzing the US CPI data. However, China's CPI data only shows autocorrelation in lag1 and lag2 pictures, or may become negative correlation over time if the lag is greater than 16.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+gglagplot(inflation.cn, do.lines=FALSE) +xlab("Lags")+ylab("Yt")+ggtitle("Lag Plot for China Monthly CPI From 2003")
+
+```
+
+
+### 3.2 Decomposition
+
+#### US CPI
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+decompose_if_us = decompose(inflation.us, "additive")
+autoplot(decompose_if_us)
+```
+
+They are both additive model with increasing trends. While China's CPI appears to be flat, it is on an upward, even more volatile, trend if you apply it on a uniform base number.
+
+
+#### China CPI
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+decompose_if_cn = decompose(inflation.cn, "additive")
+autoplot(decompose_if_cn)
+```
+
+
+### 3.3 ACF and PACF plots
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+plot1<-ggAcf(inflation.us) +ggtitle("ACF Plot for US Monthly CPI from 2002")
+
+plot2<- ggPacf(inflation.us)+ggtitle("PACF Plot for US Monthly CPI from 2002")
+
+grid.arrange(plot1, plot2,nrow=2)
+
+```
+
+The ACF plot provides valuable insights into the data. With a slow decay, the plot suggests that future values are strongly correlated with past values. Meanwhile, the PACF plot displays notable correlations at the first lag, followed by a lack of significant correlations. These observations indicate the presence of an autoregressive term in the data. Additionally, the ACF plot suggests that the time series is non-stationary, as demonstrated by the bars in the chart frequently falling outside the blue dashed lines.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+plot1<-ggAcf(inflation.cn) +ggtitle("ACF Plot for China Monthly CPI from 2002")
+
+plot2<- ggPacf(inflation.cn)+ggtitle("PACF Plot for China Monthly CPI from 2002")
+
+grid.arrange(plot1, plot2,nrow=2)
+
+```
+
+
+### 3.4 Augmented Dickey-Fuller Test
+
+#### US CPI
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+adf.test(inflation.us)      # ADF test
+```
+
+Although ACF plot of China CPI presents it is non-stationary, the ADF test gives an opposite result, rejecting null hypothesis at 1% significance level with stationary inferred.
+
+#### China CPI
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+adf.test(inflation.cn)      # ADF test
+```
+
+
+
+### 3.5 Differencing Data and Compare Stationarity
+
+#### US CPI
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+plot1 <- inflation.us %>% diff()  %>% autoplot(main="using diff() function") 
+plot2 <- ggAcf(diff(inflation.us), main="first differenced data") 
+plot3 <- autoplot(inflation.us, main="Original")
+plot4 <- ggAcf(inflation.us, main="Original")
+# plot5 <- inflation.us %>% diff() %>% diff()  %>% autoplot(main="using second diff() function") 
+# plot6 <- ggAcf(diff(inflation.us, differences = 2), main="second differenced data")
+
+grid.arrange(plot3, plot4,plot1,plot2,nrow=2,ncol=2)
+
+```
+
+Finally, to make the time series stationary, correlations should be removed. You can see that after the first order of difference, the series is stationary. As the lag plots inferred, starting from lag12, the original data of China's CPI began to enter the stage of negative correlation. However, after first order of difference, the correlation decreases and the series become stationary.
+
+
+#### China CPI
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+plot1 <- inflation.cn %>% diff()  %>% autoplot(main="using diff() function") 
+plot2 <- ggAcf(diff(inflation.cn), main="first differenced data") 
+plot3 <- autoplot(inflation.cn, main="Original")
+plot4 <- ggAcf(inflation.cn, main="Original")
+# plot5 <- inflation.us %>% diff() %>% diff()  %>% autoplot(main="using second diff() function") 
+# plot6 <- ggAcf(diff(inflation.us, differences = 2), main="second differenced data")
+
+grid.arrange(plot3, plot4,plot1,plot2,nrow=2,ncol=2)
+
+
+```
+
+
+## 4. Gross Domestic Product Exploring
+
+### 4.1 Lag Plots
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+gdp.us<-ts(gdp$us.gdp,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 4)
+gdp.cn<-ts(gdp$cn.gdp,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 4)
+
+gglagplot(gdp.us, do.lines=FALSE) +xlab("Lags")+ylab("Yt")+ggtitle("Lag Plot for US Quarterly GDP From 2002")
+```
+
+This lag effect of US GDP is similar to US CPI. 
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+gglagplot(gdp.cn, do.lines=FALSE) +xlab("Lags")+ylab("Yt")+ggtitle("Lag Plot for China Quarterly GDP From 2002")
+
+```
+
+
+In contrast, the lag plot for China's GDP depicts a consistent correlation every four quarters. For instance, the correlation between lag1 and lag5 is similar to that of lag2 and lag6, and so on for lag3 and lag7, as well as lag5 and lag9. The only slight deviation occurs between lag4 and lag8. These results suggest that China's data exhibit almost identical correlations every year, which is a peculiar phenomenon.
+
+
+### 4.2 Decomposition
+
+#### US GDP
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+decompose_gdp_us = decompose(gdp.us, "additive")
+autoplot(decompose_gdp_us)
+```
+
+
+#### China GDP
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+decompose_gdp_cn = decompose(gdp.cn, "multiplicative")
+autoplot(decompose_gdp_cn)
+```
+
+Select the multiplicative model from the original data time series graph for China's GDP decomposition. It has an increasing trend and every one-year seasonality.
+
+
+
+### 4.3 ACF and PACF plots
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+plot1<-ggAcf(gdp.us) +ggtitle("ACF Plot for US Quarterly GDP from 2002")
+
+plot2<- ggPacf(gdp.us)+ggtitle("PACF Plot for US Quarterly GDP from 2002")
+
+grid.arrange(plot1, plot2,nrow=2)
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+plot1<-ggAcf(gdp.cn) +ggtitle("ACF Plot for China Quarterly GDP from 2002")
+
+plot2<- ggPacf(gdp.cn)+ggtitle("PACF Plot for China Quarterly GDP from 2002")
+
+grid.arrange(plot1, plot2,nrow=2)
+
+```
+
+
+### 4.4 Augmented Dickey-Fuller Test
+
+#### US GDP
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+adf.test(gdp.us)      # ADF test
+```
+
+
+
+#### China GDP
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+adf.test(gdp.cn)      # ADF test
+```
+
+
+
+
+
+### 4.5 Log transformation
+
+Before differencing the data, we need to remove the heteroscedasticity by using the log() transformation.
+
+```{r, warning=FALSE, message=FALSE}
+log.gdp.us=log(gdp.us)
+log.gdp.cn=log(gdp.cn)
+```
+
+
+### 4.6 Differencing Data and Compare Stationarity
+
+#### US GDP
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+plot1 <- log.gdp.us %>% diff()  %>% autoplot(main="using diff() function") 
+plot2 <- ggAcf(diff(log.gdp.us), main="first differenced data") 
+plot3 <- autoplot(log.gdp.us, main="Original")
+plot4 <- ggAcf(log.gdp.us, main="Original")
+# plot5 <- inflation.us %>% diff() %>% diff()  %>% autoplot(main="using second diff() function") 
+# plot6 <- ggAcf(diff(inflation.us, differences = 2), main="second differenced data")
+
+grid.arrange(plot3, plot4,plot1,plot2,nrow=2,ncol=2)
+
+
+```
+
+
+#### China GDP
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+plot1 <- log.gdp.cn %>% diff()  %>% autoplot(main="using diff() function") 
+plot2 <- ggAcf(diff(log.gdp.cn), main="first differenced data") 
+plot3 <- autoplot(log.gdp.cn, main="Original")
+plot4 <- ggAcf(log.gdp.cn, main="Original")
+# plot5 <- gdp.cn %>% diff()  %>% autoplot(main="using first diff() function without log")
+# plot6 <- ggAcf(diff(gdp.cn), main="first differenced data without log")
+
+grid.arrange(plot3, plot4,plot1,plot2,nrow=2,ncol=2)
+
+
+```
+
+
+Because the original series of China's GDP is not only trending but also seasonal, more than the method of one-order differencing is needed. The series also needs to adjust the seasonality.
+

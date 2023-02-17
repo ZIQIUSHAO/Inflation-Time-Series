@@ -1,0 +1,39 @@
+---
+title: "Introduction"
+subtitle: "Inflation is Killing the American Dream. Is it true or not? How about China Five-Year Plan?"
+editor: visual
+---
+
+## Inflation affects daily life quality over time
+
+When you go grocery shopping, do you feel that everything is increasing its price sneakily? What does \$20 in 2015 buy you compared to \$20 in 2022? Or there is no need to call back long-term memory, but don't you remember to buy something last year but price plus one to get the same product for this year? Inflation is an existing, unavoidable, and invisible thing reminding the decline of your purchasing power over time.
+
+![source: <https://www.advisorperspectives.com/dshort/updates/2023/01/13/components-of-the-cpi-december>](pic/intro.png)
+
+## What is inflation? How to measure it?
+
+In economic terms, inflation is a term that significantly affects the economy of a country. It is a process of increasing the prices of goods and services over a specific period of time, as measured by a price index. One of the most commonly used price indices to measure inflation is the Consumer Price Index (CPI) published by the Bureau of Labor Statistics (BLS). The CPI compares the current month's prices with the previous month's prices, which are based on the base year in which the CPI is calculated.
+
+The alternative measure of U.S. inflation is based on the personal consumption expenditures (PCE) produced by the Bureau of Economic Analysis (BEA). Nevertheless, China commonly uses a different indicator, the Producer Price Index (PPI), collected from the National Bureau of Statistics (NBS) to reflect inflation.
+
+## Discover questions to answer
+
+**1.** Is there any trends or pattern in inflation over past 20 years?
+
+**2.** Which index is better to forecast and visualize as a measure of inflation, CPI or PCE or PPI?
+
+**3.** What is the difference between the series of inflation in China and the United States?
+
+**4.** Will industries benefit from the Inflation Spike or get hurt?
+
+**5.** What happens to the stocks of leading companies in inflation affected industries?
+
+**6.** What is the relationship between CPI and GDP?
+
+**7.** Can we predict GDP with historical data?
+
+**8.** Is the average yearly salary of all wage and salary earners in the United States still increasing without inflation?
+
+**9.** Are chained CPI and unadjusted CPI moving in the same direction?
+
+**10.** Will 2023 be a financial crisis?

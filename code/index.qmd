@@ -1,0 +1,37 @@
+---
+about:
+  id: hero-heading
+  template: jolla
+  image: pic/ziqiu.jpg
+  links:
+    - icon: wordpress
+      text: Personal Website
+      href: http://ziqiushao.georgetown.domains/
+    - icon: github
+      text: Github
+      href: https://github.com/ZIQIUSHAO
+    - icon: easel
+      text: Tableau Public
+      href: https://public.tableau.com/app/profile/ziqiu.shao
+    - icon: easel3
+      text: R Shiny
+      href: https://epy551-ziqiu-shao.shinyapps.io/StudentAdmissions/
+---
+
+# About Me
+
+### Ziqiu Shao
+
+**GU id:** *zs256*
+
+Currently a second-year graduate student of Georgetown University in Data Science and Analytics program with a Bachelor's Degree in Accounting.
+
+# About Website
+
+**Time Series Analysis**
+
+This portfolio is displaying a time series project exploring and predicting inflation effects in the United States and China.
+
+Click above navigation tabs to know more methods and results.
+
+According to different national conditions, forecasting exercise focuses on U.S. inflation, measured by the quarter-over-quarter personal consumption expenditures (PCE) chain-type price index produced by the Bureau of Economic Analysis (BEA) and the Consumer Price Index (CPI) published by the Bureau of Labor Statistics (BLS). But the most commonly used measures of inflation in China today are the Consumer Price Index (CPI) and Producer Price Index (PPI) collected from National Bureau of Statistics (NBS).

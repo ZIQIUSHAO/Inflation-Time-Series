@@ -1,0 +1,110 @@
+---
+title: "Data Sources"
+editor: visual
+code-fold: true
+code-summary: "API Version 2.0 Python Code"
+link-external-icon: true
+link-external-newwindow: true
+---
+
+Datasets are initially planned to contain four components, Consumer Price Index (CPI), Personal Consumption Expenditures (PCE), Producer Price Index (PPI), and Gross Domestic Product (GDP). Selecting time period from 2002 to 2022, all data are obtained from the following websites or institutions open database. As the analysis digs deeper, we could expect to include additional industry-specific stock and salary information.
+
+[Check all gathered data here](https://github.com/ZIQIUSHAO/Inflation-Time-Series/tree/main/data)
+
+### [Bureau of Economic Analysis (BEA)](https://apps.bea.gov/iTable/?reqid=19&step=2&isuri=1&categories=survey)
+
+![](pic/BEA.png){width="80%," height="180"}
+
+The U.S. Bureau of Economic Analysis is a public source of accurate and objective data about the US's economy. Click the link to learn more price indexes  <https://www.bea.gov/resources/learning-center/quick-guide-some-popular-bea-price-indexes>
+
+-   Personal Consumption Expenditures (PCE)
+
+![US Price Index PCE](pic/US_PIPCE.png){height="280"}
+
+The PCE price index, released each month in the Personal Income and Outlays report, reflects changes in the prices of goods and services purchased by consumers in the United States. Quarterly and annual data are included in the GDP release. It is known for capturing inflation (or deflation) across a wide range of consumer expenses and for reflecting changes in consumer behavior. For example, if the price of beef rises, shoppers may buy less beef and more chicken. 
+
+-   Gross Domestic Product (GDP) 
+
+::: {layout-ncol=2} 
+![US GDP](pic/US_GDP.png)
+
+![US Price Index GDP](pic/US_PIGDP.png) 
+:::
+
+The gross domestic product price index measures changes in the prices of goods and services produced in the United States, including those exported to other countries. Prices of imports are excluded.
+
+### [Bureau of Labor Statistics (BLS)](https://www.bls.gov/data/)
+
+![](pic/BLS.jpg){width="80%," height="180"}
+
+-   Consumer Price Index (CPI)
+
+The Consumer Price Index (CPI) is a measure of the average change over time in the prices paid by urban consumers for a market basket of consumer goods and services. Indexes are available for the U.S. and various geographic areas. Average price data for select utility, automotive fuel, and food items are also available.
+
+Historically, the CPI has received more attention and is the most commonly used measure of inflation in international discussions, mainly because the Bureau of Labor Statistics releases the CPI (two to three weeks after the end of the statistical month) before the Bureau of Economic Analysis (BEA) releases the PCE (four weeks after the end of the statistical month), Generally speaking, CPI has a more significant impact on the market. But as the Fed adopted the PCE as its main measure of inflation in 2000, markets took it more seriously.
+
+::: {layout-ncol=2} 
+![US CPI](pic/US_CPI.png)
+
+![US Chained CPI](pic/US_CCPI.png) 
+:::
+
+BLS also support public data API accessing with many different languages to retrieve data for more than one time series and more than one year. It could save a lot time instead of searching and downloading. 
+
+[API document](https://www.bls.gov/developers/api_signature_v2.htm)
+
+```{python}
+# import requests
+# import json
+# import prettytable
+# headers = {'Content-type': 'application/json'}
+# data = json.dumps({"seriesid": ['CUUR0000SA0','SUUR0000SA0'],"startyear":"2002", "endyear":"2022"})
+# p = requests.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', data=data, headers=headers)
+# json_data = json.loads(p.text)
+# for series in json_data['Results']['series']:
+#     x=prettytable.PrettyTable(["series id","year","period","value","footnotes"])
+#     seriesId = series['seriesID']
+#     for item in series['data']:
+#         year = item['year']
+#         period = item['period']
+#         value = item['value']
+#         footnotes=""
+#         for footnote in item['footnotes']:
+#             if footnote:
+#                 footnotes = footnotes + footnote['text'] + ','
+#         if 'M01' <= period <= 'M12':
+#             x.add_row([seriesId,year,period,value,footnotes[0:-1]])
+#     output = open(seriesId + '.txt','w')
+#     output.write (x.get_string())
+#     output.close()
+```
+
+### [National Bureau of Statistics of China (NBS)](https://data.stats.gov.cn/english/index.htm)
+
+![](pic/NBS.png){width="80%," height="180"}
+
+-   Consumer Price Index (CPI)
+
+![CHN CPI](pic/CN_CPI.png){height="280"}
+
+The consumer price index (CPI) measures changes in the prices of goods and services consumed by households. Such changes affect the real purchasing power of consumers’ incomes and their welfare. In practice, the official CPI of China measures the change in the level of prices for a specified basket of goods and services normally purchased by urban and rural residents.
+
+-   Producer Price Index (PPI)
+
+![CHN PPI](pic/CN_PPI.png){height="180"}
+
+The producer price index (PPI) measures the monthly changes in prices of industrial products for the domestic market by comparing prices in the current month with prices in the same month of the previous year.
+
+-   Gross Domestic Product (GDP)
+
+::: {layout-ncol=2} 
+![CHN Constant GDP](pic/CN_Constant_GDP.png)
+
+![CHN Current GDP](pic/CN_Current_GDP.png) 
+:::
+
+Current series are influenced by the effect of price inflation. Constant series are used to measure the true growth of a series, i.e. adjusting for the effects of price inflation. For example (using year one as the base year), suppose nominal Gross Domestic Product (GDP) rises from 100 billion to 110 billion, and inflation is about 4%. In real prices, the second year GDP would be approximately 106 billion, reflecting its true growth of 6%.
+
+### Stock, Wages, and Salaries (TBD)
+
+In financial time series models part, I will add more data of stock in inflation affected industries.

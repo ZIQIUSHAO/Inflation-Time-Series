@@ -1,0 +1,430 @@
+---
+title: "Data Visualization"
+editor: visual
+---
+
+```{r ,echo=FALSE, message=FALSE, warning=FALSE}
+library(flipbookr)
+library(tidyverse)
+library(ggplot2)
+library(forecast)
+library(astsa) 
+library(xts)
+library(tseries)
+library(fpp2)
+library(fma)
+library(lubridate)
+library(tidyverse)
+library(TSstudio)
+library(quantmod)
+library(tidyquant)
+library(plotly)
+library(ggplot2)
+library(dplyr)
+```
+
+This page presents a visual interpretation of the impact indicators related to inflation that were previously gathered for two countries.
+
+## US Economics Indicators
+
+The section on US economic indicators is partitioned into three segments.
+
+### CPI indicator
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(readxl)
+us.cpi <- read_excel("data/US_CPI-U(Unadjusted)_Monthly_200201_202212.xlsx", 
+    range = "A12:M33")
+
+us.cpi <- us.cpi %>% gather(Month, CPI, Jan:Dec)
+#us.cpi$Month=match(us.cpi$Month,month.abb)
+#us.cpi$Month=as.Date(us.cpi$Month,"%b")
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+us.cpi$Date=as.Date(as.yearmon(paste(us.cpi$Year,us.cpi$Month,sep="-"),"%Y-%b"))
+```
+
+
+
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+us.cpi  %>%
+   plot_ly(x=~Date, y=~CPI) %>%
+   add_lines() %>%
+  layout(title = 'Monthly Consumer Price Index in US from 2002 to 2022',
+         xaxis = list(title = 'Date'),
+         yaxis = list( title = 'Index')) 
+```
+
+
+The US unadjusted consumer-price index uses the same base period, enabling a clear increasing trend to emerge between 2002 and 2022. A more marked drop occurred in the latter half of 2008 when consumer prices fell dramatically due to the sharp decline in energy costs, exacerbated by the recession that had taken hold by December of that year. To encourage spending, producers continue to reduce prices, but while lower prices may seem beneficial to consumers, many are holding off on making purchases, opting instead to save money or reduce their debts.
+
+Negative values will be more evident in the inflation chart. Since 2002, there have been four distinct periods. Early on, inflation fell sharply in April 2003. The key factors behind this decline are improved fiscal performance, downward pressure on prices from increased global competition, and an improved monetary policy framework. In the next period, a steady rise in commodity prices starting in 2004 and a surge in energy prices in 2008 pushed inflation to its peak in July 2008. But then commodity prices collapsed in mid-2008, and the global financial crisis hit in September 2008. As a result, inflation fell below zero and remained in a deflationary period of negative inflation for most of 2009.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+us.cpi.if<-us.cpi %>%
+  group_by(Month) %>%
+  mutate(Inflation=(change=(CPI-lag(CPI,1))/lag(CPI,1)*100))
+us.cpi.if=us.cpi.if[order(us.cpi.if$Date),]
+us.cpi.if%>%
+   plot_ly(x=~Date, y=~Inflation, type = 'scatter', mode='line', fill = 'tozeroy')  %>%
+  layout(title = 'Monthly Consumer Price Inflation in US from 2002 to 2022',
+         xaxis = list(zerolinecolor = '#ffff',
+                      zerolinewidth = 2,
+                      gridcolor = 'ffff'),
+         yaxis = list(zerolinecolor = '#000000',
+                      zerolinewidth = 1,
+                      gridcolor = 'ffff'),
+         plot_bgcolor='#e5ecf6', width = 900)
+```
+
+
+In small doses, inflation is actually considered a good thing for the economy. However, inflation soared through 2022 last year, and sky-high prices could harm the economy. 
+
+- **Supply and demand mismatches**
+
+Since the pandemic, most of us have gotten used to seeing random items missing from store shelves. If you ask the manager about the missing items, you’ll likely hear them attribute the issue to a supply chain problem.
+
+For example, many households are looking to purchase a vehicle. With demand remaining approximately the same, a decreased supply of new cars due to issues securing the necessary parts has created a perfect storm of soaring prices for vehicles. Thankfully, the used vehicle market is correcting itself.
+
+- **Energy costs**
+
+With the Russian invasion of Ukraine, there has been a significant shakeup in the world’s energy supply chain. Specifically, the invasion resulted in Western sanctions on Russia.
+
+The impact of these sanctions means that Western countries are able to import less Russian oil.
+
+As fuel sources become increasingly stretched and uncertain, the cost of powering the economy has soared. Rising energy costs put inflationary pressure on other goods and services because the cost to produce the goods or provide the services is higher.
+
+For example, the cost of food might increase as a result of higher energy costs due to the higher costs of refining and transporting the item to your grocery store.
+
+
+### PCE indicator
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+us.pce <- read_csv("data/US_PIPCE_Quarterly_2002A_2022D.csv", col_names =FALSE)
+us.pce=us.pce[c(1,2,3,5,10,16),]
+us.pce <- us.pce %>%
+ group_by(X1) %>%
+ summarise_all(funs(trimws(paste(., collapse = ' '))))
+names(us.pce) <- c('id','cate',us.pce[5,-c(1,2)])
+us.pce <- us.pce[-5,] %>%
+  pivot_longer(!c('id','cate'), names_to = "YearQuarter", values_to = "PCE")
+us.pce$date <- as.Date(as.yearqtr(us.pce$YearQuarter), origin = "2002-01-01")
+us.pce=us.pce[order(us.pce$date),]
+us.pce$PCE=as.numeric(us.pce$PCE)
+us.pce[c('Year', 'Quarter')] <- str_split_fixed(us.pce$YearQuarter, ' ', 2)
+# head(us.pce)
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# fig <- plot_ly(us.pce, x = ~date, y = ~log(as.numeric(PCE)), color = ~cate) 
+fig <- plot_ly(us.pce %>% filter(cate == "Personal consumption expenditures (PCE)"), 
+        x = ~date,
+        y = ~PCE,
+        # y = ~log(PCE),
+        type = 'scatter', 
+        line = list(color='#CC9999'),
+        mode = 'line',
+        name = "overall")   %>%
+  add_trace(data=us.pce %>% filter(cate == "Household consumption expenditures (for services)"),
+        x = ~date,
+        y = ~PCE,
+        # y = ~log(PCE),
+        type = 'scatter',
+        line = list(color='#336633'),
+        mode = 'line',
+        name = "services") %>%
+  add_trace(data=us.pce %>% filter(cate == "Durable goods"),
+        x = ~date,
+        y = ~PCE,
+        # y = ~log(PCE),
+        type = 'scatter',
+        line = list(color='#0099CC'),
+        mode = 'line',
+        name = "durable goods")%>%
+  add_trace(data=us.pce %>% filter(cate == "Nondurable goods"),
+        x = ~date,
+        y = ~PCE,
+        # y = ~log(PCE),
+        type = 'scatter',
+        line = list(color='#993333'),
+        mode = 'line',
+        name = "nondurable goods")%>%
+  layout(title = 'Quarterly Personal Consumption Expenditures',
+         xaxis = list(title = 'Date'),
+         yaxis = list( title = 'Price Index'), legend = list(title=list(text='<b> Categories of PCE </b>')))
+
+fig
+```
+
+
+As explained above, there were two unusual fluctuations in 2008 and 2020. In 2008 the prices of some nondurable goods, such as meat, eggs, and milk, rose and fell; in 2020, the prices of some durable goods, such as cars and houses, rose.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+us.pce.if<-us.pce %>% filter(cate == "Personal consumption expenditures (PCE)") %>%
+  group_by(Quarter) %>%
+  mutate(Inflation=(change=(PCE-lag(PCE,1))/lag(PCE,1)*100))
+us.pce.if=us.pce.if[order(us.pce.if$date),]
+us.pce.if%>%
+   plot_ly(x=~date, y=~Inflation, type = 'scatter', mode='line', fill = 'tozeroy',
+    fillcolor = '(#CC9999,0.2)',
+    line = list(
+      color = '#CC9999'
+    ))  %>%
+  layout(title = 'Monthly PCE Inflation',
+         xaxis = list(zerolinecolor = '#ffff',
+                      zerolinewidth = 2,
+                      gridcolor = 'ffff'),
+         yaxis = list(zerolinecolor = '#000000',
+                      zerolinewidth = 1,
+                      gridcolor = 'ffff'),
+         plot_bgcolor='#e5ecf6', width = 900)
+```
+
+### GDP indicator
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+us.gdp <- read_csv("data/US_GDP_Quarterly_2002A_2022D.csv", col_names =FALSE)
+us.gdp.pi <- read_csv("data/US_GDP(PriceIndex)_Quarterly_2002A_2022D.csv", col_names =FALSE)
+prepare <- function(x) {
+  x=x[c(1:3),]
+  x <- x %>%
+ group_by(X1) %>%
+ summarise_all(funs(trimws(paste(., collapse = ' '))))
+names(x) <- c('id','cate',x[2,-c(1,2)])
+x <- x[-2,] %>%
+  pivot_longer(!c('id','cate'), names_to = "YearQuarter", values_to = "GDP")
+x$date <- as.Date(as.yearqtr(x$YearQuarter), origin = "2002-01-01")
+x=x[order(x$date),]
+x$GDP=as.numeric(x$GDP)
+x[c('Year', 'Quarter')] <- str_split_fixed(x$YearQuarter, ' ', 2)
+return(x)
+}
+
+us.gdp=prepare(us.gdp)
+
+us.gdp.pi=prepare(us.gdp.pi)
+
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+gdp <- data.frame(us.gdp$date,us.gdp$GDP,us.gdp.pi$GDP)
+# gdp
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Value used to transform the data
+coeff <- 100
+
+# A few constants
+temperatureColor <- "#69b3a2"
+priceColor <- rgb(0.2, 0.6, 0.9, 1)
+
+ggplot(gdp, aes(x=us.gdp.date)) +
+  
+  geom_line( aes(y=us.gdp.pi.GDP), size=0.8, color=temperatureColor) + 
+  geom_line( aes(y=us.gdp.GDP / coeff), size=0.8, color=priceColor) +
+  
+  scale_y_continuous(
+    
+    # Features of the first axis
+    name = "GDP Price Index",
+    
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(~.*coeff, name="GDP")
+  ) + 
+
+  theme(
+    axis.title.y = element_text(color = temperatureColor, size=13),
+    axis.title.y.right = element_text(color = priceColor, size=13)
+  ) +
+
+  ggtitle("Gross Domestic Product in US")
+```
+
+Real GDP is similarly impacted by the factors mentioned previously. The energy downturn and financial crisis in 2008, as well as the COVID-19 crisis in 2020, resulted in a decline in Real GDP. However, the adjusted GDP price index exerts a comparatively lesser influence.
+
+
+## China Economics Indicators
+
+### CPI indicator
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+cn.cpi.1 <- read_csv("data/China_CPI_Monthly_200201_201512.csv", 
+    skip = 2)
+cn.cpi.2 <- read_csv("data/China_CPI_Monthly_201601_202212.csv", 
+    skip = 2)
+fun.cn <- function(x){
+  x <- x[1,]
+x <- x%>%
+  pivot_longer(!Indicators, names_to = "YearMonth", values_to = "CPI")
+x$CPI=as.numeric(x$CPI)
+x[c('Month', 'Year')] <- str_split_fixed(x$YearMonth, ' ', 2)
+return(x)
+}
+cn.cpi.1<-fun.cn(cn.cpi.1)
+cn.cpi.2<-fun.cn(cn.cpi.2)
+cn.cpi.1$date <- as.Date(as.yearmon(cn.cpi.1$YearMonth), origin = "2002-01-01")
+cn.cpi.2$date <- as.Date(as.yearmon(cn.cpi.2$YearMonth), origin = "2016-01-01")
+cn.cpi.1=cn.cpi.1[order(cn.cpi.1$date),]
+cn.cpi.2=cn.cpi.2[order(cn.cpi.2$date),]
+cn.cpi=rbind(cn.cpi.1, cn.cpi.2)
+```
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+cn.cpi  %>%
+   plot_ly(x=~date, y=~CPI) %>%
+   add_lines() %>%
+  layout(title = 'Monthly Consumer Price Index in China from 2002 to 2022',
+         xaxis = list(title = 'Date'),
+         yaxis = list( title = 'Index')) 
+```
+
+
+China's consumer price index is based every five years, with 2005 as the base period for 2006 to 2010 and 2020 as the base period for 2021 to 2022. So it doesn't have a fixed trend; it goes up and down. Because base periods are adjusted so frequently, it seems that the impact of COVID-19 on China in 2020 will not be as strong as the impact of the financial crisis in 2008 or that the economy will recover quickly. But I personally doubt this positive phenomenon, since China's CPI doesn't take into account how much household spends on purchasing houses or apartments.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+cn.cpi.if<-cn.cpi %>%
+  group_by(Month) %>%
+  mutate(Inflation=(change=(CPI-lag(CPI,1))/lag(CPI,1)*100))
+cn.cpi.if=cn.cpi.if[order(cn.cpi.if$date),]
+cn.cpi.if%>%
+   plot_ly(x=~date, y=~Inflation, type = 'scatter', mode='line', fill = 'tozeroy')  %>%
+  layout(title = 'Monthly Consumer Price Inflation in China from 2002 to 2022',
+         xaxis = list(zerolinecolor = '#ffff',
+                      zerolinewidth = 2,
+                      gridcolor = 'ffff'),
+         yaxis = list(zerolinecolor = '#000000',
+                      zerolinewidth = 1,
+                      gridcolor = 'ffff'),
+         plot_bgcolor='#e5ecf6', width = 900)
+```
+
+### PPI indicator
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+cn.ppi <- read_csv("data/China_PPI_Monthly_200201_202212.csv", 
+    skip = 2)
+cn.ppi<-fun.cn(cn.ppi)
+colnames(cn.ppi)[colnames(cn.ppi) == "CPI"] ="PPI"
+cn.ppi$date <- as.Date(as.yearmon(cn.ppi$YearMonth), origin = "2002-01-01")
+cn.ppi=cn.ppi[order(cn.ppi$date),]
+# cn.ppi
+
+cn.ppi.if<-cn.ppi %>%
+  group_by(Month) %>%
+  mutate(Inflation=(change=(PPI-lag(PPI,1))/lag(PPI,1)*100))
+cn.ppi.if=cn.ppi.if[order(cn.ppi.if$date),]
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+p1 <- ggplot(cn.ppi, aes(x=date, y=PPI)) +
+  geom_line( color="#69b3a2", size=1, alpha=0.9) +
+  ggtitle("Monthly Producer Price Index in China from 2002 to 2022")
+p2 <- ggplot(cn.ppi.if, aes(x=date, y=Inflation)) +
+  geom_area( fill="#69b3a2", alpha=0.4) +
+  geom_line(color="#69b3a2", size=1) +
+  ggtitle("Monthly Producer Price Inflation in China from 2002 to 2022")
+
+p1
+p2
+```
+
+### GDP indicator
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+cn.constant.gdp <- read_csv("data/China_GDP(ConstantPrice)_Quarterly_2007A_2022D.csv", 
+    skip = 2)
+cn.current.gdp <- read_csv("data/China_GDP(CurrentPrice)_Quarterly_2002A_2022D.csv", 
+    skip = 2)
+fun.cn.gdp <- function(x){
+  x <- x[1,]
+x <- x%>%
+  pivot_longer(!Indicators, names_to = "YearQuarter", values_to = "GDP")
+x$GDP=as.numeric(x$GDP)
+x[c('Quarter', 'Year')] <- str_split_fixed(x$YearQuarter, ' ', 2)
+x$date <- as.Date(as.yearqtr(x$YearQuarter, "%qQ %Y"), origin = "2002-01-01")
+x=x[order(x$date),]
+return(x)
+}
+cn.constant.gdp<-fun.cn.gdp(cn.constant.gdp)
+cn.current.gdp<-fun.cn.gdp(cn.current.gdp)
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+cn.gdp <- cn.current.gdp %>% left_join(cn.constant.gdp, by = 'date')
+# cn.gdp
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+# A few constants
+temperatureColor <- "#69b3a2"
+priceColor <- rgb(0.2, 0.6, 0.9, 1)
+
+ggplot(cn.gdp, aes(x=date)) +
+  
+  geom_line( aes(y=GDP.x), size=0.8, color=temperatureColor) + 
+  geom_line( aes(y=GDP.y), size=0.8, color=priceColor) +
+  
+  scale_y_continuous(
+    
+    # Features of the first axis
+    name = "GDP (Current Price)",
+    
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(~.*coeff, name="GDP (Constant Price)")
+  ) + 
+
+  theme(
+    axis.title.y = element_text(color = temperatureColor, size=13),
+    axis.title.y.right = element_text(color = priceColor, size=13)
+  ) +
+
+  ggtitle("Gross Domestic Product in China")
+
+```
+
+
+
+## Compare US and China with CPI Inflation
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# cn.cpi.if$Inflation
+# us.cpi.if$Inflation
+# us.cpi.if$Date
+# 
+# cn.cpi.if%>%
+#    plot_ly(x=~date, y=~Inflation, type = 'scatter', mode='line', fill = 'tozeroy')
+# us.cpi.if%>%
+#    plot_ly(x=~Date, y=~Inflation, type = 'scatter', mode='line', fill = 'tozeroy')  
+
+fig <- plot_ly()%>%
+  add_trace(data=us.cpi.if, x=~Date, y=~Inflation, type = 'scatter', mode='line', fill = 'tozeroy', name='US')%>%
+  add_trace(data=cn.cpi.if, x=~date, y=~Inflation, type = 'scatter', mode='line', fill = 'tozeroy', name='China')%>%
+  layout(title = 'Monthly Consumer Price Inflation from 2002 to 2022',
+         xaxis = list(zerolinecolor = '#ffff',
+                      zerolinewidth = 2,
+                      gridcolor = 'ffff'),
+         yaxis = list(zerolinecolor = '#000000',
+                      zerolinewidth = 1,
+                      gridcolor = 'ffff'),
+         plot_bgcolor='#e5ecf6', width = 900)
+fig
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# write.csv(us.cpi.if,file='data/us_cpi_if.csv',row.names = FALSE)
+# write.csv(cn.cpi.if,file='data/cn_cpi_if.csv',row.names = FALSE)
+# write.csv(cn.current.gdp,file='data/cn_current_gdp.csv',row.names = FALSE)
+# write.csv(us.gdp,file='data/us_gdp.csv',row.names = FALSE)
+# write.csv(us.pce.if,file='data/us_pce_if.csv',row.names = FALSE)
+```
+
+
