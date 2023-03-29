@@ -49,15 +49,23 @@ cpi.cn.ts<-ts(cpi$cn.cpi,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-
 
 In this tab, I will utilize either ARIMA or SARIMA models to make predictions for CPI and CPI inflation, depending on whether their time series exhibit seasonality or not. Based on the information obtained from the previous exploratory data analysis (EDA) tab, it is evident that almost all of the series require differencing to achieve stationarity. To confirm this and to determine which model is suitable for making predictions, we will create detailed plots as follows.
 
+# Explore Data
+
 Step 1 --- Check stationarity and seasonality: If a time series has a trend or seasonality component, it must be made stationary before we can use ARIMA to forecast. Before fitting and building the model, it is easier to predict when the series is stationary. Stationary time series is when the mean and variance are constant over time.
 
 -   ACF graphs
 
 -   the Augmented Dickey-Fuller Test
 
+    -- The Augmented Dickey-Fuller (ADF) Test has the following hypothesis:
+
+        Ho: Unit root exists (non-stationary)
+
+        H1: No unit root Exists (stationary)
+
 -   Lag Plot (if time series has defined seasonality)
 
-**US CPI Inflation**
+## US CPI Inflation
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 ggAcf(infla.us.ts, lag.max = 300) +ggtitle("ACF Plot for US Monthly CPI Inflation from 2003")
@@ -67,49 +75,59 @@ adf.test(infla.us.ts)
 gglagplot(infla.us.ts, do.lines=FALSE, set.lags = 1:24)
 ```
 
-The ACF plot for the original series indicates that US CPI Inflation time series data is non-stationary, as the above ACF is “decaying”, or decreasing, very slowly, and remains well above the significance range (dotted blue lines). This non-stationarity is also supported by the p-value of the ADF test, which is greater than 0.05. However, there are no clear seasonal patterns observed from the lag plots. Therefore, an appropriate modeling approach, such as an ARIMA model, may be used to make predictions in this case.
-
+The ACF plot for the original series indicates that US CPI Inflation time series data is non-stationary, as the above ACF is "decaying", or decreasing, very slowly, and remains well above the significance range (dotted blue lines). This non-stationarity is also supported by the p-value of the ADF test, which is greater than 0.05. However, there are no clear seasonal patterns observed from the lag plots. Therefore, an appropriate modeling approach, such as an **ARIMA model**, may be used to make predictions in this case.
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 
-ggAcf(diff(infla.us.ts)) +ggtitle("ACF Plot for US Monthly CPI Inflation with first differenced from 2003")
+ggAcf(diff(infla.us.ts), lag.max = 36) +ggtitle("ACF Plot for US Monthly CPI Inflation with first differenced from 2003")
 
 adf.test(diff(infla.us.ts))
 ```
 
 This is the first difference of the above series, which has been found to be stationary based on both the ACF and ADF tests. Therefore, the time series with the first order difference is now suitable for further analysis.
 
-
-**US CPI**
+## US CPI
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-ggAcf(cpi.us.ts, lag.max = 300) +ggtitle("ACF Plot for US Monthly CPI from 2002")
+ggAcf(cpi.us.ts, lag.max = 50) +ggtitle("ACF Plot for US Monthly CPI from 2002")
 
 adf.test(cpi.us.ts)
 
 gglagplot(cpi.us.ts, do.lines=FALSE, set.lags = c(12,24,36,48))
 ```
 
-The ACF plot for the original series indicates that US CPI time series data is non-stationary, as the above ACF is “decaying”, or decreasing, very slowly, and remains well above the significance range (dotted blue lines). This non-stationarity is also supported by the p-value of the ADF test, which is greater than 0.05. However, there are no clear seasonal patterns observed from the lag plots. Therefore, an appropriate modeling approach, such as an ARIMA model, may be used to make predictions in this case.
-
+The ACF plot for the original series indicates that US CPI time series data is non-stationary, as the above ACF is "decaying", or decreasing, very slowly, and remains well above the significance range (dotted blue lines). This non-stationarity is also supported by the p-value of the ADF test, which is greater than 0.05. However, there are no obvious seasonal patterns observed from the lag plots. Therefore, it is not clear at this point which appropriate modeling approach we should use.
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 ggAcf(diff(cpi.us.ts),lag.max = 50) +ggtitle("ACF Plot for US Monthly CPI with first differenced from 2002")
+```
 
-d2<- cpi.us.ts %>% diff() %>% diff()
-ggAcf(d2) +ggtitle("ACF Plot for US Monthly CPI with second differenced from 2002")
+
+You can see that the first ordinary differencing is not enough because we can clearly see the seasonal correlation. Therefore, we need to proceed with the seasonal correlation. After the first ordinary differencing, the data are strongly seasonal and obviously non-stationary, so seasonal differencing will be used. The seasonally differenced data are shown below. 
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ggAcf(diff(cpi.us.ts, lag=12),lag.max = 50) +ggtitle("ACF Plot for US Monthly CPI with first seasonal differenced from 2002")
+```
+
+
+I decided to do another ordinary differencing to meet the requirement of stationarity and **SARIMA model** may be used to make predictions in this case.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+d2<- cpi.us.ts %>% diff(lag=12) %>% diff()
+ggAcf(d2) +ggtitle("ACF Plot for US Monthly CPI with first seasonal differenced and second differenced from 2002")
 
 adf.test(d2)
 
 ```
 
-In order for the time series to be suitable for further analysis, time series data must be stationary. Thus, we can proceed with analyzing the time series using its second order difference, as first order difference is still non-stationary.
+In order for the time series to be suitable for further analysis, time series data must be stationary. Thus, we can proceed with analyzing the time series using its second order difference, as first seasonal order difference is still non-stationary.
 
-## ARIMA Model
+# ARIMA Model
 
-### US CPI Inflation
+## US CPI Inflation
 
-#### Selecting Parameters
+### Selecting Parameters
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 plot1<-ggAcf(diff(infla.us.ts)) +ggtitle("ACF Plot for US Monthly CPI Inflation with first difference from 2003")
@@ -123,9 +141,7 @@ grid.arrange(plot1, plot2,nrow=2)
 
 Based on trends in the data, the order of differencing(d) required for this model is one. Next, based on autocorrelations and partial autocorrelations, it can determine the order of regression (p) and order of moving average (q). From what can be observed in above figures, p could be selected as 1 and 2, while q could be choosen as one
 
-
-#### Selecting the model
-
+### Selecting the model
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 d=1
@@ -157,8 +173,22 @@ knitr::kable(temp)
 
 ```
 
-After the two comparisons, the second model that ARIMA(2,1,1) has smaller AIC and AICc values. 
+After the two comparisons, the second model that ARIMA(2,1,1) has smaller AIC and AICc values.
 
+### Equation of the model
+
+```{r, message=FALSE, warning=FALSE}
+Arima(infla.us.ts, order=c(2, 1, 1))
+```
+
+$$\phi(B)(1-B)x_t=\theta(B)w_t$$
+
+$$\phi(B)=(1+0.5262B-0.2085B^2)$$
+
+$$\theta(B)=(1+0.036B)$$
+
+
+### Model diagnostics
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 model_output <- capture.output(sarima(infla.us.ts, 2,1,1))
@@ -167,28 +197,18 @@ model_output <- capture.output(sarima(infla.us.ts, 2,1,1))
 
 The above model diagnostics for ARIMA(2,1,1) model indicate that the standardized residuals plot has no discernible trends, seasonality or large variations, with a constant mean centered around 0. The ACF of residuals plot shows that the majority of values lie within the significance bands. The Q-Q plot demonstrates nearly linear behavior and suggests normality, with a few outliers at the two tails. However, the Ljung-Box Statistic plot shows that lag values from 13 to 20 have p-values below 0.05, indicating that the model may not be as optimal as suggested by the other plots. Nevertheless, lag values up until 12 have p-values above 0.05, which suggest that they are not statistically significant and therefore may still support the null hypothesis that Residual is white noise.
 
-```{r, message=FALSE, warning=FALSE}
-Arima(infla.us.ts, order=c(2, 1, 1))
-```
-
-Equation of the model:
-
-$$\phi(B)(1-B)x_t=\theta(B)w_t$$
-
-$$\phi(B)=(1+0.5662B-0.2085B^2)$$
-
-$$\theta(B)=(1+0.036B)$$
 
 ```{r,warning=FALSE, message=FALSE}
 auto.arima(infla.us.ts)
 
 ```
 
-The function auto.arima() is a tool that automatically selects the best model for a given time series. However, in this case, the best model generated by the function is ARIMA(0,1,2), which differs from the chosen model. This could be due to the series exhibiting high correlation with its lag 1 and lag 2 data, as indicated by the Lag Plot.
+The function auto.arima() is a tool that automatically selects the best model for a given time series. However, in this case, the best model generated by the function is ARIMA(0,1,2)(0,0,1)[12], which differs from the chosen model. This could be due to the series exhibiting high correlation with its lag 1 and lag 2 data, as indicated by the Lag Plot. And slightly seasonal effect is ignored when manually selecting model parameters.
 
 
-#### Predicting forecasts 
 
+
+### Predicting forecasts
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 ################# Forecast #################
@@ -202,9 +222,7 @@ infla.us.ts %>%
 
 According to forecasts above, the CPI inflation is expected to increase until it reaches its peak, and then gradually decline. However, it is anticipated to continue rising at a slow pace after the decline, as indicated by the slope of the curve and the confidence interval. The prediction chart shows that there is still considerable uncertainty regarding the variance of the data, which is reflected in the wide margin of the confidence band.
 
-
-
-#### Comparing benchmark methods
+### Comparing benchmark methods
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 s=length(infla.us.ts)
@@ -261,129 +279,192 @@ autoplot(infla.us.ts) +
 
 The ARIMA model has the lowest mean absolute error and root mean squared error from the above table. This is an excellent indication that the chosen model was a good choice. Additionally, the graph demonstrates that while the benchmark methods generate straight-line forecasts, the ARIMA model displays fluctuations, even when they do not connect with the preceding point.
 
-### US CPI
+# SARIMA Model
 
-#### Selecting Parameters
+## US CPI
+
+### Selecting Parameters
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-plot1<-ggAcf(d2) +ggtitle("ACF Plot for US Monthly CPI with second difference from 2003")
+plot1<-ggAcf(d2, lag.max = 36) +ggtitle("ACF Plot for US Monthly CPI with Seasonally & Ordinary differenced from 2003")
 
-plot2<- ggPacf(d2)+ggtitle("PACF Plot for US Monthly CPI Inflation with second difference from 2003")
+plot2<- ggPacf(d2, lag.max = 36)+ggtitle("PACF Plot for US Monthly CPI with Seasonally & Ordinary differenced from 2003")
 
 grid.arrange(plot1, plot2,nrow=2)
 
 
 ```
 
-Based on trends in the data, the order of differencing(d) required for this model is one. Next, based on autocorrelations and partial autocorrelations, it can determine the order of regression (p) and order of moving average (q). From what can be observed in above figures, p could be selected as 2, 3, and 6, while q could be choosen as 2 and 3.
+Based on trends in the data, the order of differencing(d) required for this model is two, first seasonal differencing and second ordinary differencing. Next, based on autocorrelations and partial autocorrelations, it can determine the order of regression (p) and order of moving average (q). From what can be observed in above figures, p could be selected as 0, 1, and 2, while q could be choosen as 0 and 1. In the plots of the differenced data, there are spikes in the PACF at lags 12 and almost at 24, and seasonal lag 12 in the ACF. The pattern in the ACF is not indicative of any simple model.
 
+So q=0,1 ; p=1,2; Q=0,1; P=0,1; d=1; D=1; s=12
 
-#### Selecting the model
-
+### Selecting the model
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-i=1
-temp= data.frame()
-ls=matrix(rep(NA,6*8),nrow=8)
-
-for (p in c(2,3,6)) ##p=2,3,6
-{
-  for(q in c(2,3)) ##q=2,3
+#write a funtion
+SARIMA.c=function(p1,p2,q1,q2,P1,P2,Q1,Q2,data){
+  
+#K=(p2+1)*(q2+1)*(P2+1)*(Q2+1)
+  
+  temp=c()
+  d=1
+  D=1
+  s=12
+  
+  i=1
+  temp= data.frame()
+  ls=matrix(rep(NA,9*16),nrow=16)
+  
+  
+  for (p in p1:p2)
   {
-    for(d in 1:2) ##d=1,2
+    for(q in q1:q2)
     {
-      
-      if(p+d+q<=8)
+      for(P in P1:P2)
       {
-        
-        model<- Arima(cpi.us.ts,order=c(p,d,q),include.drift=TRUE) #including drift because of the obvious trend
-        ls[i,]= c(p,d,q,model$aic,model$bic,model$aicc)
-        i=i+1
-        #print(i)
-        
+        for(Q in Q1:Q2)
+        {
+          if(p+d+q+P+D+Q<=10)
+          {
+            
+            model<- Arima(data,order=c(p,d,q),seasonal=c(P,D,Q))
+            ls[i,]= c(p,d,q,P,D,Q,model$aic,model$bic,model$aicc)
+            i=i+1
+            #print(i)
+            
+          }
+          
+        }
       }
-      
     }
+    
   }
+  
+  
+  temp= as.data.frame(ls)
+  names(temp)= c("p","d","q","P","D","Q","AIC","BIC","AICc")
+  
+  temp
+  
 }
 
-temp= as.data.frame(ls)
-names(temp)= c("p","d","q","AIC","BIC","AICc")
+output=SARIMA.c(p1=1,p2=2,q1=0,q2=1,P1=0,P2=1,Q1=0,Q2=1,data=cpi.us.ts)
 
-#temp
-knitr::kable(temp)
-
+knitr::kable(output)
 ```
 
-After the eight comparisons, the first model that ARIMA(2,1,2) has the smallest BIC value and ARIMA(3,1,2) model has smallest AIC and AICc values.
+Parameter combination with smallest AIC value
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-model_output <- capture.output(sarima(cpi.us.ts, 2,1,2))
+output[which.min(output$AIC),]
+```
 
+Parameter combination with smallest BIC value
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+output[which.min(output$BIC),]
+```
+
+After the sixteen comparisons, the model that ARIMA(1,1,1)(0,1,1)[12] has the smallest AIC and BIC values. ARIMA(2,1,1)(0,1,1)[12] has the second smallest AIC and BIC values.
+
+### Equation of the model
+
+```{r, message=FALSE, warning=FALSE}
+Arima(cpi.us.ts, order=c(1,1,1),seasonal=c(0,1,1))
+```
+
+$$\phi(B)(1-B)(1-B^{12})x_t=\theta(B)\Theta(B)w_t$$
+
+$$\phi(B)=(1+0.3173B)$$
+
+$$\theta(B)=(1+0.3227B)$$
+
+$$\Theta(B)=(1-0.9526B^{12})$$
+
+
+### Model diagnostics
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+fit <- Arima(cpi.us.ts, order=c(1,1,1), seasonal=c(0,1,1))
+checkresiduals(fit, lag=36)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-model_output <- capture.output(sarima(cpi.us.ts, 3,1,2))
+fit2 <- Arima(cpi.us.ts, order=c(2,1,1), seasonal=c(0,1,1))
+checkresiduals(fit2, lag=36)
 
 ```
 
-The above model diagnostics for both ARIMA model indicate that the standardized residuals plot has no discernible trends, seasonality or large variations, with a constant mean centered around 0. The ACF of residuals plot shows that the majority of values lie within the significance bands. The Q-Q plot demonstrates nearly linear behavior and suggests normality, with a few outliers at the two tails. However, the Ljung-Box Statistic plot shows that lag values from 12 to 20 have p-values below 0.05, indicating that the model may not be as optimal as suggested by the other plots. Nevertheless, lag values up until 12 have p-values above 0.05, which suggest that they are not statistically significant and therefore may still support the null hypothesis that Residual is white noise.
+    -- The Ljung-Box Test has the following hypothesis:
 
+        Ho: Residual is white noise
 
+        H1: Residual is not white noise
+
+The above model diagnostics for both SARIMA model indicate that the standardized residuals plot has no discernible trends, seasonality or large variations, with a constant mean centered around 0. The standardized residual is much more consistent across the graph, meaning that the data is closer to being stationary. The ACF of residuals plot shows that the majority of values lie within the significance bands. The residual distribution plot suggests normality. Moreover, the Ljung-Box Statistic results show that p-values are greater than 0.05, which suggests that they are not statistically significant and therefore may still support the null hypothesis that Residual is white noise.
 
 ```{r,warning=FALSE, message=FALSE}
 auto.arima(cpi.us.ts)
 ```
 
-The function auto.arima() is a tool that automatically selects the best model for a given time series. However, in this case, the best model generated by the function is ARIMA(0,0,2), which differs from the chosen model. This could be due to the series exhibiting high correlation with its lag 1 and lag 2 data, as indicated by the Lag Plot.
-
-
-#### Predicting forecasts 
-
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-################# Forecast #################
-diff(cpi.us.ts) %>%
-  Arima(order=c(2,1,2),include.drift = TRUE) %>%
-  forecast(30) %>%
-  autoplot() +
-  ylab("CPI Inflation prediction") + xlab("Year")
+fit3 <- Arima(cpi.us.ts, order=c(0,1,2), seasonal=c(0,0,2))
+checkresiduals(fit3, lag=36)
 
 ```
 
-According to forecasts above, the CPI inflation is expected to increase until it reaches its peak, and then gradually decline. However, it is anticipated to continue rising at a slow pace after the decline, as indicated by the slope of the curve and the confidence interval. The prediction chart shows that there is still considerable uncertainty regarding the variance of the data, which is reflected in the wide margin of the confidence band.
+The function auto.arima() is a tool that automatically selects the best model for a given time series. However, in this case, the best model generated by the function is ARIMA(0,1,2)(0,0,2)[12], which differs from the chosen model.
+
+### Predicting forecasts
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 ################# Forecast #################
-diff(cpi.us.ts) %>%
-  Arima(order=c(3,1,2),include.drift = TRUE) %>%
+cpi.us.ts %>%
+  Arima(order=c(1,1,1),seasonal=c(0,1,1),include.drift = TRUE) %>%
   forecast(30) %>%
   autoplot() +
-  ylab("CPI Inflation prediction") + xlab("Year")
+  ylab("CPI prediction") + xlab("Year")
 
 ```
 
-#### Comparing benchmark methods
+
+According to forecasts above, the CPI is expected to fluctuate with an increasing trend.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+################# Forecast #################
+cpi.us.ts %>%
+  Arima(order=c(0,1,2),seasonal=c(0,0,2),include.drift = TRUE) %>%
+  forecast(30) %>%
+  autoplot() +
+  ylab("CPI prediction") + xlab("Year")
+
+```
+
+Fitting ARIMA(0,1,2)(0,0,2)[12] model obtained by running auto.arima() function, the forecasts still show an increasing trend, but with reduced fluctuations.
+
+### Comparing benchmark methods
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 s=length(cpi.us.ts)
 train_series=ts(cpi.us.ts[1:201], start=c(2003,1), frequency = 12) # 80% of the data
 test_series=ts(cpi.us.ts[202:252], start=c(2018,10), frequency = 12) #20% of the data
 
-arimaModel_1=arima(train_series, order=c(2,1,2))
-arimaModel_1=arima(train_series, order=c(3,1,2))
+SarimaModel_1=Arima(train_series,order=c(1,1,1),seasonal=c(0,1,1))
+SarimaModel_2=Arima(train_series,order=c(0,1,2),seasonal=c(0,0,2))
 m1=meanf(train_series, h=20)
 m2=naive(train_series, h=20)
 m3=rwf(train_series, drift=TRUE, h=40)
 a1 <- as.data.frame(accuracy(m1))
 a2 <- as.data.frame(accuracy(m2))
 a3 <- as.data.frame(accuracy(m3))
-a4 <- as.data.frame(accuracy(arimaModel_1))
-a5 <- as.data.frame(accuracy(arimaModel_2))
+a4 <- as.data.frame(accuracy(SarimaModel_1))
+a5 <- as.data.frame(accuracy(SarimaModel_2))
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 df <- data.frame(
-  Model = c("Arima(2,1,2)", "Arima(3,1,2)", "Mean Forecast", "Naive", "Random Walk Forecast"),
+  Model = c("Sarima(0,1,2)(0,0,2)", "Sarima(1,1,1)(0,1,1)", "Mean Forecast", "Naive", "Random Walk Forecast"),
   MAE = c(a5$MAE, a4$MAE, a1$MAE, a2$MAE, a3$MAE),
   RMSE = c(a5$RMSE, a4$RMSE, a1$RMSE, a2$RMSE, a3$RMSE)
 ) %>%
@@ -391,17 +472,6 @@ df <- data.frame(
 df
 ```
 
-```{r, message=FALSE, warning=FALSE}
-Arima(cpi.us.ts, order=c(2, 1, 2))
-```
-
-Equation of the model:
-
-$$\phi(B)(1-B)x_t=\theta(B)w_t$$
-
-$$\phi(B)=(1+1.3384B-0.339B^2)$$
-
-$$\theta(B)=(1-0.6483B-0.3326B^2)$$
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 #################################################
@@ -419,18 +489,90 @@ autoplot(cpi.us.ts) +
             series="Drift", PI=FALSE) +
   autolayer(rwf(train_series, drift=TRUE, h=40),
             series="Drift.train", PI=FALSE) +
-  autolayer(forecast(arimaModel_1,50), 
-            series="ARIMA.train",PI=FALSE) +
-  autolayer(forecast(arima(test_series, order=c(2,1,1)),50),
-            series="ARIMA",PI=FALSE) +
+  autolayer(forecast(SarimaModel_1,50), 
+            series="SARIMA.train",PI=FALSE) +
+  autolayer(forecast(arima(test_series, order=c(1,1,1),seasonal=c(0,1,1)),50),
+            series="SARIMA",PI=FALSE) +
   ggtitle("US CPI") +
   xlab("Time") + ylab("CPI") +
   guides(colour=guide_legend(title="Forecast"))
 
 ```
 
-The ARIMA(2,1,2) model has the lowest mean absolute error and root mean squared error from the above table. This is an excellent indication that the chosen model was a good choice. Additionally, the graph demonstrates that while the benchmark methods generate straight-line forecasts, the ARIMA model displays fluctuations, even when they do not connect with the preceding point using train dataset to forecast.
+The ARIMA(1,1,1)(0,1,1)[12] model has the lowest mean absolute error and root mean squared error from the above table. This is an excellent indication that the chosen model was a good choice. Additionally, the graph demonstrates that while the benchmark methods generate straight-line forecasts, the SARIMA model displays fluctuations, even when they do not connect with the preceding point using train dataset to forecast.
 
 
+### Forecast evaluation with a rolling origin
 
+Do a seasonal cross validation using 1 step ahead forecasts and 12 steps ahead forecasts.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+k <- 60 # minimum data length for fitting a model (5 seasonal lags)
+n <- length(cpi.us.ts)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+## Seasonal Cross Validation (1 Step Ahead)
+mae <- matrix(NA, n - k, 12)
+st <- tsp(cpi.us.ts)[1] + (k - 2) / 12
+
+i <- 1
+
+for (i in 1:(n - k)) {
+  xtrain <- window(cpi.us.ts, end = st + i / 12)
+  xtest <- window(cpi.us.ts, start = st + (i + 1) / 12, end = st + (i + 12) / 12)
+
+  fit <- Arima(xtrain,
+    order = c(1, 1, 1), seasonal = list(order = c(0, 1, 1), period = 12),
+    include.drift = TRUE, lambda = 0, method = "ML"
+  )
+  fcast <- forecast(fit, h = 12)
+
+  mae[i, 1:length(xtest)] <- abs(fcast$mean - xtest)
+}
+
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+## Seasonal Cross Validation (12 Steps Ahead)
+mae1 <- matrix(NA, (n - k) / 12, 12)
+st <- tsp(cpi.us.ts)[1] + (k - 1) / 12
+e <- (n - k) / 12
+
+i <- 1
+
+for (i in 1:e) {
+  xtrain <- window(cpi.us.ts, end = st + (i - 1))
+  xtest <- window(cpi.us.ts, start = st + (i - 1) + 1 / 12, end = st + i)
+
+  fit <- Arima(xtrain,
+    order = c(1, 1, 1), seasonal = list(order = c(0, 1, 1), period = 12),
+    include.drift = TRUE, lambda = 0, method = "ML"
+  )
+  fcast <- forecast(fit, h = 12)
+
+  mae1[i, 1:length(xtest)] <- abs(fcast$mean - xtest)
+}
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+plot(1:12, colMeans(mae,na.rm=TRUE), type="l", col=6, xlab="horizon", ylab="MAE")
+lines(1:12, colMeans(mae1,na.rm=TRUE), type="l",col=8)
+legend("topleft",legend=c("1 Step Ahead","12 Steps Ahead"),col=c(6,8),lty=1)
+```
+
+1-step and 12-step time series cross validation forecasts Mean Absolute Error (MAE) are both rising as the number of horizons increases. But between around 5 and 7, 12-step MAE is higher than 1-step, which probably caused by seasonality. 1-step ahead cross validation may perform better when making anti-season predictions. However, because this is based on fewer estimation steps, the results are much more volatile. It may be best to average over the forecast horizon.
+
+
+::: callout-note
+## CODE
+
+Please follow the provided link to access additional code
+
+[Click](https://github.com/ZIQIUSHAO/Inflation-Time-Series/blob/main/code/model.qmd)
+:::
 
