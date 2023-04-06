@@ -1,0 +1,787 @@
+---
+title: "ARIMAX/SARIMAX/VAR Models"
+editor: visual
+link-external-icon: true
+link-external-newwindow: true
+code-fold: true
+---
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+library(forecast)
+library(astsa) 
+library(xts)
+library(tseries)
+library(fpp2)
+library(fma)
+library(lubridate)
+library(TSstudio)
+library(quantmod)
+library(tidyquant)
+library(plotly)
+library(ggplot2)
+library(vars)
+library(zoo)
+```
+
+## Fit ARIMAX/SARIMAX model
+
+Inflation, or the general increase in the price level of goods and services over time, is influenced by a variety of factors that can impact the supply and demand dynamics in an economy. Some of the key variables that can influence inflation include:
+
+-   Aggregate demand & Aggregate supply
+
+##### Crude Oil Price
+
+Inflation can be influenced by changes in aggregate demand, which is the total demand for goods and services in an economy. Changes in aggregate supply, which is the total amount of goods and services that an economy can produce, can also influence inflation.I choose Crude Oil Price as an Exogenous Variable. When aggregate demand exceeds the capacity of the economy to produce goods and services, it can lead to increasing price.
+
+-   Labor market conditions
+
+##### Personal Income & Unemployment Rate
+
+The conditions of the labor market, including wages, employment levels, and labor productivity, can also impact inflation. When labor market conditions tighten, with low unemployment and increasing wages, it can lead to higher production costs for businesses, which can be passed on to consumers in the form of higher prices. So for this part, **Personal Income** and **Unemployment Rate** would be collected as two Exogenous Variables.
+
+-   Monetary policy
+
+##### Interest Rates & Money Supply (M1 and M2)
+
+The actions of central banks, such as the Federal Reserve in the United States, can also influence inflation through monetary policy tools such as **Interest Rates** and **Money Supply**. For example, when central banks raise interest rates, it can lead to higher borrowing costs for businesses and consumers, which can dampen demand and potentially lower inflation. Conversely, when central banks lower interest rates or increase the money supply, it can stimulate borrowing and spending, potentially leading to higher inflation.
+
+-   Exchange rates
+
+##### US Dollar Price Index
+
+Changes in exchange rates, which determine the value of one currency relative to another, can also impact inflation, especially in economies that are highly reliant on international trade. When the domestic currency depreciates, it can lead to higher import prices, which can contribute to inflation by increasing the cost of imported goods and services. So, **US Dollar Price Index** will be considered to analyze.
+
+### Plotting the Data
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+# Oil Price
+
+oil <- read_excel("data/US_Oil_Monthly_200201_202212.xls", range = "A195:B447")
+names(oil) <- c("Date", "Oil_Price")
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+# Personal Income
+
+income <- read_csv("data/US_Income_Quarterly_2002A_2022D.csv", col_names =FALSE)
+
+prepare <- function(x) {
+  x=x[c(1:3),]
+  x <- x %>%
+ group_by(X1) %>%
+ summarise_all(funs(trimws(paste(., collapse = ' '))))
+names(x) <- c('id','cate',x[2,-c(1,2)])
+x <- x[-2,] %>%
+  pivot_longer(!c('id','cate'), names_to = "YearQuarter", values_to = "Income")
+x$date <- as.Date(as.yearqtr(x$YearQuarter), origin = "2002-01-01")
+x=x[order(x$date),]
+x$Income=as.numeric(x$Income)
+x[c('Year', 'Quarter')] <- str_split_fixed(x$YearQuarter, ' ', 2)
+return(x)
+}
+
+income=prepare(income)
+
+### break quarterly data into monthly data
+DF <- income[c("YearQuarter","Income")]
+
+
+
+library(zoo)
+
+z <- read.zoo(DF, FUN = function(x) as.yearqtr(x, "%Y Q%q"))
+Value <- zooreg(na.approx(c(t(cbind(z, NA, NA)))), 
+  start = as.yearmon(start(z)), end = as.yearmon(end(z)),freq = 12)
+income <- fortify.zoo(Value) # optional
+
+income <- income %>% 
+   add_row(Index = as.yearmon("Nov 2022"), Value = 22368.30) %>% 
+   add_row(Index = as.yearmon("Dec 2022"), Value = 22368.30)
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+# Unemployment rate
+
+unemploy <- read_excel("data/US_Unemployment_Monthly_200201_202212.xlsx", range = "A12:M33")
+
+unemploy <- unemploy %>% gather(Month, Rate, Jan:Dec)
+
+unemploy$Date=as.Date(as.yearmon(paste(unemploy$Year,unemploy$Month,sep="-"),"%Y-%b"))
+
+unemploy <- unemploy[order(unemploy$Date),]
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+# Interest Rates
+
+interest <- read_csv("data/US_EFFR_Monthly_200201_202212.csv")
+interest <- interest[-c(1:5),]
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+# Money Supply
+
+supply <- read_csv("data/US_M1_M2_Monthly_200201_202212.csv")
+supply <- supply[-c(1:5),]
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+# US Dollar Price Index
+
+dollar <- read_csv("data/US_Dollar_Monthly_200201_202212.csv")
+
+dollar <- dollar[,c(1,6)]
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+# Inflation
+
+us.cpi <- read_excel("data/US_Inflation_Monthly_200101-202212.xlsx", 
+    range = "A12:M34")
+
+
+us.cpi <- us.cpi %>% gather(Month, CPI, Jan:Dec)
+
+us.cpi$Date=as.Date(as.yearmon(paste(us.cpi$Year,us.cpi$Month,sep="-"),"%Y-%b"))
+
+
+us.cpi.if<-us.cpi %>%
+  group_by(Month) %>%
+  mutate(Inflation=(change=(CPI-lag(CPI,1))/lag(CPI,1)*100))
+
+us.cpi.if=us.cpi.if[order(us.cpi.if$Date),]
+
+
+us.cpi.if=us.cpi.if[-c(1:12),]
+
+#write.csv(us.cpi.if,file='data/us_cpi_if.csv',row.names = FALSE)
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+# Combine
+
+dd<-data.frame(oil,income,unemploy, interest, supply, dollar, us.cpi.if)
+
+dd<-dd[,c(8,20,2,4,7,10,12,13,15)]
+
+colnames(dd)<-c("DATE","Inflation","Oil_Price","Income","Unemploy","Interest","M1","M2","Dollar")
+
+knitr::kable(head(dd))
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+dd.ts<-ts(dd,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+
+autoplot(dd.ts[,c(2:9)], facets=TRUE) +
+  xlab("Year") + ylab("") +
+  ggtitle("Variables influencing Inflation in USA")
+```
+
+From the plot showing above, it is obvious that Income, M1, and M2 these exogenous variables is increasing rapidly. M1 and M2 are measurements of the United States money supply, known as the money aggregates. M1 includes money in circulation plus checkable deposits in banks. M2 includes M1 plus savings deposits (less than \$100,000) and money market mutual funds. That's why those values need a log transformation.
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+
+library(dplyr)
+dd <- dd %>% mutate_at(c("Inflation","Oil_Price","Income","Unemploy","Interest","M1","M2","Dollar"), as.numeric)
+# 
+# dd1 <- dd %>%
+#   pivot_longer(!DATE, names_to = "variables", values_to = "values")
+# 
+# ggplot(dd1, aes(DATE, values)) + 
+#   geom_line() + 
+#   facet_wrap(~variables, scales = "free_y", ncol = 1)
+#   
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+lg.dd<-dd #making a copy
+lg.dd$Income<-log(dd$Income);lg.dd$M1<-log(dd$M1);lg.dd$M2<-log(dd$M2)
+
+lg.dd.ts<-ts(lg.dd,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+
+autoplot(lg.dd.ts[,c(2:9)], facets=TRUE) +
+  xlab("Year") + ylab("") +
+  ggtitle("Variables influencing Inflation in USA")
+```
+
+The scales of all variables in this new plot look much better. So I'm going to use data with log Income, log M1, and log M2 to continue.
+
+### Fitting the model using 'auto.arima()\`
+
+Here I'm using auto.arima() function to fit the ARIMAX model. Here we are trying to predict Inflation using Oil Price, Personal Income, Unemployment Rate, Interest Rate, M1, M2, US Dollar Price Index.
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+
+# "Oil_Price","Income","Unemploy","Interest","M1","M2","Dollar"
+
+xreg <- cbind(Oil = lg.dd.ts[, "Oil_Price"],
+              Inco = lg.dd.ts[, "Income"],
+              Unem = lg.dd.ts[, "Unemploy"],
+              Inte = lg.dd.ts[, "Interest"],
+              M1 = lg.dd.ts[, "M1"],
+              M2 = lg.dd.ts[, "M2"],
+              Doll = lg.dd.ts[, "Dollar"]
+              
+              )
+
+fit <- auto.arima(lg.dd.ts[, "Inflation"], xreg = xreg)
+summary(fit)
+
+```
+
+As you can see from summary, SARIMA(1,0,2)(1,0,0)\[12\] model is the best model provided by auto.arima() function.
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+checkresiduals(fit)
+
+```
+
+The above model diagnostics for both SARIMA(1,0,2)(1,0,0)\[12\] model indicate that the standardized residuals plot has no discernible trends, seasonality or large variations, with a constant mean centered around 0. The standardized residual is much more consistent across the graph, meaning that the data is closer to being stationary. The ACF of residuals plot shows that the majority of values lie within the significance bands. The residual distribution plot doesn't look much like a normal distribution. Moreover, the Ljung-Box Statistic results show that p-values are much smaller than 0.05, which suggests that they are statistically significant and therefore may reject the null hypothesis. So Ljung-Box indicates that Residual is not white noise. But we can't fully rely on Ljung-Box.
+
+### Fitting the model manually
+
+Here we will first have to fit the linear regression model predicting Inflation using Oil Price, Personal Income, Unemployment Rate, Interest Rate, M1, M2, US Dollar Price Index.
+
+Then for the residuals, we will fit an ARIMA/SARIMA model.
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+# "Oil_Price","Income","Unemploy","Interest","M1","M2","Dollar"
+lg.dd$Inflation<-ts(lg.dd$Inflation,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+lg.dd$Oil_Price<-ts(lg.dd$Oil_Price,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+lg.dd$Income<-ts(lg.dd$Income,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+lg.dd$Unemploy<-ts(lg.dd$Unemploy,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+lg.dd$Interest<-ts(lg.dd$Interest,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+lg.dd$M1<-ts(lg.dd$M1,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+lg.dd$M2<-ts(lg.dd$M2,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+lg.dd$Dollar<-ts(lg.dd$Dollar,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+
+############# First fit the linear model##########
+fit.reg <- lm(Inflation ~ Oil_Price+Income+Unemploy+Interest+M1+M2+Dollar, data=lg.dd)
+summary(fit.reg)
+
+```
+
+This is the summary for linear regression model implying that Income and M2 don't have significant relationship with inflation. This may be due to the rapid growth of income over the past 20 years, coupled with effective inflation control measures, resulting in a minimal impact of inflation on income. Additionally, M2, which includes savings on top of M1, often doesn't get utilized for consumption purposes, which typically does not exert significant pressure on inflation.
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+############# First fit the linear model##########
+fit.reg <- lm(Inflation ~ Oil_Price+Unemploy+Interest+M1+Dollar, data=lg.dd)
+summary(fit.reg)
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+res.fit<-ts(residuals(fit.reg),star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+
+############## Then look at the residuals ############
+
+res.fit %>% ggtsdisplay()
+```
+
+Residuals's ACF and PACF plot shows that it needs to be differenced, since ACF plot has too many corelations.
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+res.fit %>% diff() %>% ggtsdisplay()
+```
+
+This plot is after first ordinary differencing.
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+res.fit %>% diff(12) %>% ggtsdisplay()
+```
+
+This plot is after first seasonal differencing.
+
+Based on trends in the data, the order of differencing(d) required for this model is two, first seasonal differencing and second ordinary differencing. Next, based on autocorrelations and partial autocorrelations, it can determine the order of regression (p) and order of moving average (q). From what can be observed in above figures, p could be selected as 0, 1, and 2, while q could be choosen as 0 and 1. In the plots of the differenced data, there are no spikes in the ACF relate to seasonal lags. The pattern in the ACF is not indicative of any simple model.
+
+So q=1,3 ; p=1,2; Q=1,2; P=0:3; d=1; D=0; s=12
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+
+#q=1,3 Q=1 , p=1,2, P=1,2
+#write a funtion
+SARIMA.c=function(p1,p2,q1,q2,P1,P2,Q1,Q2,d1,d2,data){
+  
+  temp=c()
+  D=0
+  s=12
+  
+  i=1
+  temp= data.frame()
+  ls=matrix(rep(NA,9*91),nrow=91)
+  
+  
+  for (p in p1:p2)
+  {
+    for(q in q1:q2)
+    {
+      for(P in P1:P2)
+      {
+        for(Q in Q1:Q2)
+        {
+          for(d in d1:d2)
+       
+        {
+          if(p+d+q+P+D+Q<=8)
+          {
+            
+            model<- Arima(data,order=c(p-1,d,q-1),seasonal=c(P-1,D,Q-1))
+            ls[i,]= c(p-1,d,q-1,P-1,D,Q-1,model$aic,model$bic,model$aicc)
+            i=i+1
+            #print(i)
+            
+          }
+          
+        }
+      }
+    }
+    
+  }
+  
+  }
+  temp= as.data.frame(ls)
+  names(temp)= c("p","d","q","P","D","Q","AIC","BIC","AICc")
+  
+  temp
+  
+}
+
+## q=1,3 ; p=1,2; Q=1,2; P=0:3; d=1; D=0; s=12
+## p1,p2,q1,q2,P1,P2,Q1,Q2,d1,d2,data
+output=SARIMA.c(p1=1,p2=3,q1=1,q2=4,P1=1,P2=4,Q1=1,Q2=3,d1=0,d2=1,data=res.fit)
+
+
+knitr::kable(output)
+
+```
+
+Here are 48 combinations of parameters for model. And following are the models with smallest AIC, BIC, and AICc values.
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+output[which.min(output$AIC),] 
+
+output[which.min(output$BIC),]
+
+output[which.min(output$AICc),]
+
+```
+
+After the forty-eight comparisons, the model that ARIMA(1,0,1)(0,0,1)\[12\] has the smallest AIC and AICc values. ARIMA(0,1,1)(0,0,1)\[12\] has the smallest BIC value.
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+set.seed(1234)
+
+model_output1 <- capture.output(sarima(res.fit, 1,0,1, 0,0,1,12)) 
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+model_output1 <- capture.output(sarima(res.fit, 0,1,1, 0,0,1,12)) 
+```
+
+The only difference between the model diagnostic of ARIMA(1,0,1)(0,0,1)\[12\] and that of ARIMA(0,1,1)(0,0,1)\[12\] is the plot of p values for Ljung-Box statistic. In order to make the residuals white noise, the p-values for the Ljung-Box statistic should generally be above a predetermined significance level, such as 0.05 or 0.1, indicating that there is no significant autocorrelation present in the residuals. So, ARIMA(1,0,1)(0,0,1)\[12\] is better.
+
+### Using cross validation
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+
+n=length(res.fit)
+k=92
+ 
+ #n-k=252; 252/4=63;
+ 
+rmse1 <- matrix(NA, 63,12)
+rmse2 <- matrix(NA,63,12)
+rmse3 <- matrix(NA,63,12)
+
+st <- tsp(res.fit)[1]+(k-1)/12
+
+for(i in 1:53)
+{
+  #xtrain <- window(a10, start=st+(i-k+1)/12, end=st+i/12)
+  xtrain <- window(res.fit, end=st + i / 12)
+  xtest <- window(res.fit, start = st + (i + 1) / 12, end = st + (i + 12) / 12)
+  
+  #ARIMA(1,0,2)(1,0,0)[12] ARIMA(2,0,0)(0,1,1)[12]  ARIMA(1,0,0)(0,1,1)[12]
+  
+  fit <- Arima(xtrain, order=c(1,0,2), seasonal=list(order=c(1,0,0), period=12),
+                include.drift=TRUE, method="ML")
+  fcast <- forecast(fit, h=12)
+  
+  fit2 <- Arima(xtrain, order=c(1,0,1), seasonal=list(order=c(0,0,1), period=12),
+                include.drift=TRUE, method="ML")
+  fcast2 <- forecast(fit2, h=12)
+  
+  fit3 <- Arima(xtrain, order=c(0,1,1), seasonal=list(order=c(0,0,1), period=12),
+                include.drift=TRUE, method="ML")
+  fcast3 <- forecast(fit3, h=12)
+  
+
+  rmse1[i,1:length(xtest)]  <- sqrt((fcast$mean-xtest)^2)
+  rmse2[i,1:length(xtest)] <- sqrt((fcast2$mean-xtest)^2)
+  rmse3[i,1:length(xtest)] <- sqrt((fcast3$mean-xtest)^2)
+  
+}
+
+plot(1:12, colMeans(rmse1,na.rm=TRUE), type="l", col=2, xlab="horizon", ylab="RMSE")
+lines(1:12, colMeans(rmse2,na.rm=TRUE), type="l",col=3)
+lines(1:12, colMeans(rmse3,na.rm=TRUE), type="l",col=4)
+legend("topleft",legend=c("fit1","fit2","fit3"),col=2:4,lty=1)
+
+```
+
+fit1 is auto.arima() function model, fit2 is ARIMA(1,0,1)(0,0,1)\[12\] which has the smallest AIC and AICc values, and fit3 is ARIMA(0,1,1)(0,0,1)\[12\] which has the smallest BIC value. From the plot, fit1 has the highest RMSE. The two manual fitting models' RMSE are less differentiating at some level. ARIMA(1,0,1)(0,0,1)\[12\] has better performance.
+
+### Fitting the chosen model
+
+```{r, message=FALSE, warning=FALSE}
+xreg <- cbind(Oil = lg.dd[, "Oil_Price"],
+              Unem = lg.dd[, "Unemploy"],
+              Inte = lg.dd[, "Interest"],
+              M1 = lg.dd[, "M1"],
+              Doll = lg.dd[, "Dollar"]
+              
+              )
+
+fit <- Arima(lg.dd$Inflation,order=c(1,0,1),seasonal=c(0,0,1),xreg=xreg)
+summary(fit)
+```
+
+Equation of the choosen model ARIMA(1,0,1)(0,0,1)\[12\]:
+
+$$Inflation=0.003Oil-0.0188Unemployment+0.1830Interest+0.1158M1+0.0038Dollar+n_t$$
+
+$$\phi(B)n_t=\theta(B)\Theta(B)z_t$$
+
+$$\phi(B)=(1+0.9999B)$$
+$$\theta(B)=(1+0.4878B)$$
+
+
+$$\Theta(B)=(1-B^{12})$$
+
+### Forecasting with auto.arima()
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+### Oil_Price+Unemploy+Interest+M1+Dollar
+OIL_fit<-auto.arima(lg.dd$Oil_Price) #fiting an ARIMA model to the Oil_Price variable
+#summary(OIL_fit) 
+foil<-forecast(OIL_fit)
+
+UNE_fit<-auto.arima(lg.dd$Unemploy) #fiting an ARIMA model to the Unemploy variable
+#summary(UNE_fit)
+fune<-forecast(UNE_fit)
+
+INT_fit<-auto.arima(lg.dd$Interest) #fiting an ARIMA model to the Interest variable
+#summary(INT_fit)
+fint<-forecast(INT_fit)
+
+M1_fit<-auto.arima(lg.dd$M1) #fiting an ARIMA model to the M1 variable
+#summary(M1_fit)
+fm1<-forecast(M1_fit)
+
+DOL_fit<-auto.arima(lg.dd$Dollar) #fiting an ARIMA model to the Dollar variable
+#summary(DOL_fit)
+fdol<-forecast(DOL_fit)
+
+fxreg <- cbind(Oil = foil$mean,
+              Une = fune$mean,
+              Int = fint$mean,
+              M1 = fm1$mean,
+              Dol = fdol$mean
+              )
+
+fcast <- forecast(fit, xreg=fxreg) #fimp$mean gives the forecasted values
+autoplot(fcast) + xlab("Year") +
+  ylab("Inflation")
+
+```
+
+According to forecasts, inflation is expected to decline until 2023, reaching approximately 3%, and then increase thereafter. Following that, minor fluctuations in inflation are expected. The forecast is logical, considering that inflation is currently at its highest level in recent years, and the government is likely to implement various policies to prevent inflation from approaching abnormal levels, as well as stimulate economic growth in the future.
+
+## Fit VAR model
+
+### Plotting the Data
+
+CPI, PPI, GDP, and PCE are all economic indicators used to measure different aspects of the economy and its performance.
+
+The interrelationship between these indicators is that changes in CPI and PPI can impact GDP and PCE. For example, if CPI and PPI increase, it may lead to higher costs for businesses and reduce consumer purchasing power, which could result in decreased consumer spending (reflected in PCE) and potentially lower GDP growth. Conversely, if CPI and PPI decrease, it may lead to lower costs for businesses and increase consumer purchasing power, which could result in increased consumer spending and potentially higher GDP growth. These indicators are closely monitored by policymakers, economists, and businesses to assess the health and performance of the economy and make informed decisions.
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+### PPI
+ppi <- read_excel("data/US_PPI_Monthly_200201_202212.xlsx", range = "A12:M33")
+
+ppi <- ppi %>% gather(Month, Rate, Jan:Dec)
+
+ppi$Date=as.Date(as.yearmon(paste(ppi$Year,ppi$Month,sep="-"),"%Y-%b"))
+
+ppi <- ppi[order(ppi$Date),]
+
+cpi <- read.csv('data/us_cpi_if.csv')
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+
+pce <- read.csv("data/us_pce_if.csv")
+
+gdp <- read.csv("data/us_gdp.csv")
+
+### break quarterly data into monthly data
+
+breaktomonth <- function(v){
+  
+  DF <- v[c("YearQuarter",toupper(deparse(substitute(v))))]
+
+  z <- read.zoo(DF, FUN = function(x) as.yearqtr(x, "%Y Q%q"))
+  Value <- zooreg(na.approx(c(t(cbind(z, NA, NA)))), start = as.yearmon(start(z)), end = as.yearmon(end(z)),freq = 12)
+  
+  v <- fortify.zoo(Value) # optional
+
+  v <- v %>% 
+    add_row(Index = as.yearmon("Nov 2022"), Value = v[length(v[,1]),2]) %>% 
+    add_row(Index = as.yearmon("Dec 2022"), Value = v[length(v[,1]),2])
+  
+  return (v)
+}
+
+pce <- breaktomonth(pce)
+
+gdp <- breaktomonth(gdp)
+
+```
+
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+### combine
+
+df<-data.frame(ppi,cpi,gdp,pce)
+
+df<-df[,c(4,3,7,11,13)]
+
+colnames(df)<-c("DATE","PPI","CPI","GDP","PCE")
+
+knitr::kable(head(df))
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+
+df.ts<-ts(df,star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+
+autoplot(df.ts[,c(2:5)], facets=TRUE) +
+  xlab("Year") + ylab("") +
+  ggtitle("CPI, PPI, GDP, and PCE in USA")
+
+```
+
+CPI measures changes in the prices of goods and services that households purchase for consumption. PPI measures changes in the prices of goods and services that producers receive for their products. GDP is a measure of the total value of all goods and services produced within a country's borders during a specific period. PCE is a measure of household spending on goods and services, which is a major component of GDP. All of these four indicators have same direction of trend.
+
+
+### Fitting the model using 'VARselect()'
+
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+VARselect(df[, c(2:5)], lag.max=10, type="both")
+```
+
+It is evident that based on the selection criteria, VAR(2) and VAR(10) models are considered favorable when fitting models with p=2 and 10, respectively.
+
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+summary(VAR(df[, c(2:5)], p=2, type='both'))
+```
+
+The summary typically presents the estimated coefficients for each variable in the VAR model. These coefficients represent the estimated impact of one variable on another variable, and they are often accompanied by standard errors, t-statistics, and p-values. Positive coefficients indicate a positive relationship, while negative coefficients indicate a negative relationship between the variables. The standard errors, t-statistics, and p-values can be used to assess the statistical significance of the estimated coefficients. A low p-value (typically below a chosen significance level, such as 0.05) indicates that the coefficient is statistically significant, suggesting a reliable relationship between the variables.
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+summary(VAR(df[, c(2:5)], p=10, type='both'))
+```
+
+
+For both VAR(2) and VAR(10), it is common to observe that some variables are statistically significant in some multivariate models while not in others. However, it is not advisable to remove an insignificant variable unless it consistently lacks statistical significance across all multivariate models. 
+
+
+### Using cross validation
+
+
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+
+n=length(df$CPI)
+k=60 #5*12
+
+#n-k=192; 192/12=16;
+
+rmse1 <- matrix(NA, 192,4)
+rmse2 <- matrix(NA, 192,4)
+
+# Convert data frame to time series object
+ts_obj <- ts(df[, c(2:5)], star=decimal_date(as.Date("2002-01-01",format = "%Y-%m-%d")),frequency = 12)
+
+st <- tsp(ts_obj )[1]+(k-2)/12 
+
+
+for(i in 1:16)
+{
+  
+  xtrain <- window(ts_obj, end=st + i-1)
+  xtest <- window(ts_obj, start=st + (i-1) + 1/12, end=st + i)
+  
+  
+  fit <- VAR(xtrain, p=2, type='both')
+  fcast <- predict(fit, n.ahead = 12)
+  
+  fcpi<-fcast$fcst$CPI
+  fppi<-fcast$fcst$PPI
+  fgdp<-fcast$fcst$GDP
+  fpce<-fcast$fcst$PCE
+  ff<-data.frame(fcpi[,1],fppi[,1],fgdp[,1],fpce[,1])
+  
+  year<-st + (i-1) + 1/12
+  
+  ff<-ts(ff,start=c(year,1),frequency = 12)
+  
+  a = 12*i-11
+  b= 12*i
+  rmse1[c(a:b),]  <-sqrt((ff-xtest)^2)
+  
+  fit2 <- VAR(xtrain, p=10, type='both')
+  fcast2 <- predict(fit2, n.ahead = 12)
+  
+  fcpi<-fcast2$fcst$CPI
+  fppi<-fcast2$fcst$PPI
+  fgdp<-fcast2$fcst$GDP
+  fpce<-fcast2$fcst$PCE
+  ff2<-data.frame(fcpi[,1],fppi[,1],fgdp[,1],fpce[,1])
+  
+  year<-st + (i-1) + 1/12
+  
+  ff2<-ts(ff2,start=c(year,1),frequency = 12)
+  
+  a = 12*i-11
+  b= 12*i
+  rmse2[c(a:b),]  <-sqrt((ff2-xtest)^2)
+}
+
+yr = rep(c(2007:2022),each =12)
+mr = rep(paste0("Q",1:12),16)
+
+rmse1 = data.frame(yr,mr,rmse1)
+names(rmse1) =c("Year", "Month","CPI","PPI","GDP", "PCE")
+rmse2 = data.frame(yr,mr,rmse2)
+names(rmse2) =c("Year", "Month","CPI","PPI","GDP", "PCE")
+
+ggplot() + 
+  geom_line(data = rmse1, aes(x = Year, y = CPI),color = "blue") +
+  geom_line(data = rmse2, aes(x = Year, y = CPI),color = "red") +
+  labs(
+    title = "CV RMSE for CPI",
+    x = "Date",
+    y = "RMSE",
+    guides(colour=guide_legend(title="Fit")))
+
+
+
+```
+
+
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+ggplot() + 
+  geom_line(data = rmse1, aes(x = Year, y = PPI),color = "blue") +
+  geom_line(data = rmse2, aes(x = Year, y = PPI),color = "red") +
+  labs(
+    title = "CV RMSE for PPI",
+    x = "Date",
+    y = "RMSE",
+    guides(colour=guide_legend(title="Fit")))
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+ggplot() + 
+  geom_line(data = rmse1, aes(x = Year, y = GDP),color = "blue") +
+  geom_line(data = rmse2, aes(x = Year, y = GDP),color = "red") +
+  labs(
+    title = "CV RMSE for GDP",
+    x = "Date",
+    y = "RMSE",
+    guides(colour=guide_legend(title="Fit")))
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+ggplot() + 
+  geom_line(data = rmse1, aes(x = Year, y = PCE),color = "blue") +
+  geom_line(data = rmse2, aes(x = Year, y = PCE),color = "red") +
+  labs(
+    title = "CV RMSE for PCE",
+    x = "Date",
+    y = "RMSE",
+    guides(colour=guide_legend(title="Fit")))
+```
+
+All the red color line represents for VAR(10) model, and blue represents VAR(2). For CPI, VAR(10) has smaller RMSE value, but VAR(2) model have better performance for the rest indicators. This may be because the CPI is more sensitive to short-term changes, while other indicators are better predictors over time. Cause my goal is about inflation which is mostly measured by CPI. VAR(2) is my choice.
+
+### Fitting the chosen model
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+
+var2 <- VAR(as.ts(df[, c(2:5)]), p=2, type='both')
+
+summary(var2)
+
+```
+
+Equation of the choosen model VAR(2):
+
+$$PPI=0.8070PPI_{t-1}+0.07488PPI_{t-2}+0.1197CPI_{t-1}-0.5908CPI_{t-2}+0.00004081GDP_{t-1}-0.0007774GDP_{t-2}+5.031PCE_{t-1}-2.981PCE_{t-2}-57.02-0.04309$$
+
+$$CPI=-0.08363PPI_{t-1}+0.05083PPI_{t-2}+1.226CPI_{t-1}-0.5871CPI_{t-2}+0.0005227GDP_{t-1}-0.0005864GDP_{t-2}+1.792PCE_{t-1}-0.5750PCE_{t-2}-28.36-0.02538$$
+
+
+$$GDP=-4.921PPI_{t-1}-1.305PPI_{t-2}-8.201CPI_{t-1}+1.490CPI_{t-2}+1.566GDP_{t-1}-0.6141GDP_{t-2}+131.1PCE_{t-1}-112.1PCE_{t-2}-1340-0.6646$$
+
+
+$$PCE=-0.007001PPI_{t-1}+0.001498PPI_{t-2}-0.008912CPI_{t-1}-0.006646CPI_{t-2}-0.000008576GDP_{t-1}+0.000005831GDP_{t-2}+1.825PCE_{t-1}-0.7579PCE_{t-2}-1.808-0.001757$$
+
+
+### Forecasting from the chosen model
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+
+
+forecast(var2) %>%
+  autoplot() + xlab("Year")
+
+```
+
+
+The forecasts indicate that PPI, CPI, GDP, and PCE will exhibit consistent growth over the next few years. The current VAR model forecast does not raise any alarm bells as per conventional economic theories, suggesting that a recession may not be imminent. Furthermore, the current economic status appears to be robust and dynamic.
+
+
+::: callout-note
+## CODE
+
+Please follow the provided link to access additional code
+
+[Click](https://github.com/ZIQIUSHAO/Inflation-Time-Series/blob/main/code/multi-model.qmd)
+
+## Literature Review
+
+Please follow the provided link to access additional references
+
+[Click](https://github.com/ZIQIUSHAO/Inflation-Time-Series/blob/main/reference/more.txt)
+
+:::
+
+
+
+
+

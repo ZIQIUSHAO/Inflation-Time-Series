@@ -1,0 +1,50 @@
+
+Effective Federal Funds Rate  The Federal Reserve     ARIMAX
+
+US unemployment rate BLS     ARIMAX
+
+World oil price  eia  U.S. Energy Information Administration   ARIMAX
+
+PPI   BLS     VAR
+
+real personal income BEA    ARIMAX
+
+US dollar price index  yahoo     ARIMAX
+
+M1
+      The Federal Reserve   ARIMAX
+M2
+
+
+GDP   VAR
+
+PCE    VAR
+
+
+ARIMAX Literature
+
+chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://www.cbn.gov.ng/out/2014/sd/short%20term%20inflation%20forecasting%20models%20for%20nigeria.pdf
+
+https://medium.com/inflation-forecasting-using-sarimax-and-nkpc/plotting-monthly-inflation-over-the-selected-time-period-to-check-if-the-time-series-has-any-35e3b1fac761
+
+https://github.com/SwatiSethee/Inflation-Forecasting-using-SARIMAX-and-NKPC-Economic-Model/blob/master/SARIMAX%20Forecasting.ipynb
+
+chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://iopscience.iop.org/article/10.1088/1742-6596/1397/1/012074/pdf
+
+VAR Literature
+
+chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://www.bankofengland.co.uk/-/media/boe/files/quarterly-bulletin/1993/var-models-of-inflation.pdf
+
+https://notes.quantecon.org/submission/5cc8e7dd4174bb001a39a8ff
+
+chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://econ.unc.edu/wp-content/uploads/sites/38/2020/09/VAR-Analysis-of-Economic-Activity-Unemployment-and-Inflation-during-Periods-Preceding-Recessions-in-the-United-States-COVID-19.pdf
+
+chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://www.scirp.org/pdf/OJS20120300017_19026472.pdf
+
+chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://www.grips.ac.jp/vietnam/VDFTokyo/Doc/35LVHung18Aug07Paper.pdf
+
+chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://www.snb.ch/n/mmr/reference/economic_studies_2006_02/source/economic_studies_2006_02.n.pdf
+
+https://www.mathworks.com/help/econ/fit-a-var-model.html
+
+chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://www.federalreserve.gov/econres/feds/files/2021014pap.pdf
