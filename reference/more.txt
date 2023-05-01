@@ -48,3 +48,16 @@ chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://www.snb.ch/n/mmr/ref
 https://www.mathworks.com/help/econ/fit-a-var-model.html
 
 chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://www.federalreserve.gov/econres/feds/files/2021014pap.pdf
+
+
+
+
+
+
+DEEP LEARNING
+
+
+https://machinelearningmastery.com/understanding-simple-recurrent-neural-networks-in-keras/
+
+
+
