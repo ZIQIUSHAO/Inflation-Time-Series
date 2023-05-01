@@ -1,4 +1,253 @@
 ---
 title: "Financial Time Series Models"
 editor: visual
+link-external-icon: true
+link-external-newwindow: true
+code-fold: true
+code-tools: true
 ---
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(forecast)
+library(astsa) 
+library(xts)
+library(tseries)
+library(fpp2)
+library(fma)
+library(lubridate)
+library(tidyverse)
+library(TSstudio)
+library(quantmod)
+library(tidyquant)
+library(plotly)
+library(ggplot2)
+library(TSA)
+library(fGarch) 
+library(dynlm)
+library(kableExtra)
+```
+
+
+
+This section of the project focuses on fitting time series data with a statistical model that accounts for variance in the data. Specifically, autoregressive conditional heteroscedasticity (ARCH) models, which are used when there is an autoregressive term in the error variance, are employed. ARCH models are commonly used to model time series data that exhibit volatility, which is often observed in financial time series. 
+
+Based on the previous analysis, particularly in the "Data Visualization" section, it has been observed that significant fluctuations in the Consumer Price Index (CPI) and related inflation are largely influenced by global energy shortages and price surges. As a result, there may be a connection between oil, gas, and potentially gold prices, as well as the stock returns of companies in these industries, and macroscopic inflation analysis. This suggests that changes in energy prices and the performance of related industries could have an impact on inflation trends at a macroeconomic level. Further exploration and analysis of these factors could provide valuable insights into the relationship between energy markets, industry performance, and inflation dynamics.
+
+Formerly known as Apache, APA is a major U.S. oil and gas exploration and production company. Therefore, in this tab, stock data from APA will be retrieved and analyzed using a combination of ARCH and ARIMA models. After collecting adjusted closing prices from Yahoo Finance, the visualization below presents the price trends over a 20-year period from 2002.
+
+
+### Plot data and comprehend the stationarity and volatility
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+
+getSymbols("APA", from='2002-01-01', src='yahoo')
+
+df <- data.frame(Date=index(APA),coredata(APA))
+
+# annotation
+a <- list(text = "Structure Change",
+          x = '2021-03-01',
+          y = 1.02,
+          xref = 'x',
+          yref = 'paper',
+          xanchor = 'left',
+          showarrow = FALSE
+          )
+
+# use shapes to create a line
+l <- list(type = line,
+          x0 = '2021-03-01',
+          x1 = '2021-03-01',
+          y0 = 0,
+          y1 = 1,
+          xref = 'x',
+          yref = 'paper',
+          line = list(color = 'black',
+                      width = 0.5)
+          )
+
+fig <- df %>% plot_ly(x = ~Date, type="ohlc",
+          open = ~APA.Open, close = ~APA.Close,
+          high = ~APA.High, low = ~APA.Low) 
+fig <- fig %>% layout(title = "APA Stock Price From 2002",
+         annotations = a,
+         shapes = l)
+
+fig
+
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+apa.close<- Ad(APA)
+apa.close <- na.omit(apa.close)
+returns = diff(log(apa.close))
+chartSeries(returns)
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+candleChart(APA,multi.col=TRUE,theme='white')
+
+```
+
+
+
+### Fit an AR/ARMA/ARIMA model
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+ggAcf(returns, lag.max = 100) +
+  ggtitle("ACF of APA Returns")
+
+ggPacf(returns, lag.max = 100) +
+  ggtitle("PACF of APA Returns")
+```
+
+After differencing the data, it is evident from the ACF and PACF plots that an ARIMA model is needed to accurately fit the data. It is likely that an ARCH model will also be needed for the residuals, but this depends on the actual residuals. To start, let's fit an ARIMA model. Based on the ACF and PACF plots mentioned earlier, it would be appropriate to explore ARIMA models with p values ranging from 1 to 5 and q values ranging from 1 to 5. Since the data has been differenced once (d=1), we can set d to 1. The following results were obtained from fitting various ARIMA models with different values of p and q.
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+log.apa=log(apa.close)
+
+######################## Check for different combinations ########
+
+
+d=1
+i=1
+temp= data.frame()
+ls=matrix(rep(NA,6*63),nrow=63) # roughly nrow = 3x4x2
+
+
+for (p in 1:6)
+{
+  for(q in 1:6)
+  {
+    for(d in 0:1)# 
+    {
+      
+      if(p-1+d+q-1<=8)
+      {
+        
+        model<- Arima(log.apa,order=c(p-1,d,q-1),include.drift=TRUE) 
+        ls[i,]= c(p-1,d,q-1,model$aic,model$bic,model$aicc)
+        i=i+1
+        #print(i)
+        
+      }
+      
+    }
+  }
+}
+
+temp= as.data.frame(ls)
+names(temp)= c("p","d","q","AIC","BIC","AICc")
+
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+#temp
+knitr::kable(temp)%>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%
+  scroll_box(width = "100%", height = "500px")
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+temp[which.min(temp$AIC),]
+temp[which.min(temp$BIC),]
+temp[which.min(temp$AICc),]
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+#Diagnostics
+#sarima(log.apa,2,1,5)
+model_output <- capture.output(sarima(log.apa,2,1,5))
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+#sarima(log.apa,0,1,0)
+model_output <- capture.output(sarima(log.apa,0,1,0))
+```
+
+
+
+### Fit an ARCH/GARCH model
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+arima1=Arima(log.apa,order=c(2,1,5))
+res.arima1=arima1$res
+squared.res.arima1=res.arima1^2
+
+
+
+plot(squared.res.arima1,main='Squared Residuals')
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+ggAcf(abs(squared.res.arima1),40)
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+acf.squared1=acf(squared.res.arima1,main='ACF Squared Residuals', lag.max = 100)
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+pacf.squared1=pacf(squared.res.arima1,main='PACF Squared Residuals', lag.max = 100)
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+ARCH <- list() ## set counter
+cc <- 1
+for (p in 1:8) {
+ARCH[[cc]] <- garch(res.arima1,order=c(0,p),trace=F)
+cc <- cc + 1
+} 
+
+## get AIC values for model evaluation
+ARCH_AIC <- sapply(ARCH, AIC) ## model with lowest AIC is the best
+ARCH[[which(ARCH_AIC == min(ARCH_AIC))]]
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+checkresiduals(garch(res.arima1,,order=c(0,6),trace=F))
+
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+fit <- garch(res.arima1, order = c(0,6), trace = FALSE)
+
+Box.test(fit$residuals, type = "Ljung")
+
+```
+
+
+
+### Write the equation of the final model
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+fit1<- Arima(log.apa,order=c(2,1,5))
+fit1
+
+fit2 <- garch(res.arima1, order = c(0,6), trace = FALSE)
+fit2
+
+```
+
+Equation of the choosen model ARIMA(2,1,5)+ARCH(8):
+
+$$\phi(B)(1-B)n_t=\theta(B)z_t+0.0003172$$
+
+$$\phi(B)=(1-0.2254B-0.9067B^2)$$
+
+$$\theta(B)=(1+0.255B+0.935B^2+0.0497B^3+0.0014B^4+0.0311B^5)$$
+
+$$z_t=\sigma_t \epsilon_t$$ 
+$$\sigma_t = 0.000207+0.219634 z_{t-1}+0.119294 z_{t-2}+0.096388 z_{t-3}+0.100952 z_{t-4}+0.199790 z_{t-5}+0.093094 z_{t-6}$$
+
+
+
+
+
