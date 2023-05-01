@@ -1,4 +1,256 @@
 ---
 title: "Deep Learning for TS"
 editor: visual
+link-external-icon: true
+link-external-newwindow: true
+code-fold: true
 ---
+
+Depending on the nature of the problem and the complexity of the time series, different types of recurrent neural networks can be used. LSTM is the most commonly used architecture because it is effective at learning long-term dependencies and preventing the vanishing gradient problem. However, GRU is a simpler alternative to LSTM that can be more computationally efficient, while still being able to learn complex patterns in the data. It is recommended to experiment with different architectures and parameters to determine which works best for a given time series problem.
+
+
+In this section, you’ll know most of what there is to know about using Recurrent Neural Networks, Gated Recurrent Unit, and Long Short Term Memory with
+Keras. The following contents demonstrate all three concepts on a inflation-forecasting problem, where you have access to a time series of data points coming from Consumer Price Index. And regularization techniques will be covered and compared to fight overfitting
+in recurrent layers. To connect and compare the traditional models with state-of-the-art deep learning models, some metrics will be used in the end of each series.
+
+
+
+## US CPI Inflation
+
+This graph shows the overall trend of CPI inflation from 2002 to 2022. The inflation rate is typically calculated using the inflation rate formula: (B - A)/A x 100 where A is the starting number and B is the ending number.
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/Inflation.html" title="Inflation Plot"></iframe>
+```
+
+
+### Recurrent Neural Networks
+
+Recurrent Neural Networks (RNN) combine past predictions with current information to make predictions about future outputs. In the context of analyzing Inflation time series data, a recursive neural network can be trained using the TensorFlow framework and Keras library. For example, a simple RNN model could consist of three hidden layers and a dense output layer that uses the hyperbolic tangent activation function.
+
+To prevent overfitting, a second model can be constructed using regularization techniques while keeping the other model parameters constant. The training process involves feeding the model with historical Inflation data, and then testing the model's ability to predict future values using a validation dataset.
+
+Training losses and validation losses can be plotted over different periods to evaluate the performance of the model. This information can be used to optimize the model and improve its accuracy in predicting future trends.
+
+
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/InflationR.html" title="Inflation Plot"></iframe>
+```
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/InflationRL.html" title="Inflation Plot"></iframe>
+```
+
+
+From the figure above, regularization appears to generate smaller loss values initially, but then eliminates training losses at a slow rate over epoches.
+
+
+### Gated Recurrent Unit (GRU)
+
+The Gated Recurrent Unit (GRU) neural network combines the functionality of the forgotten gate and the input gate into a single update gate, resulting in simpler cells than those of the Long Short-Term Memory (LSTM) network. Despite their simpler design, GRUs have been shown to achieve comparable accuracy to LSTMs. 
+
+To analyze the performance of GRUs on Inflation sequences, two models are constructed using the TensorFlow framework and Keras library. The training process involves feeding the models with historical Inflation data, and then testing their ability to predict future values using a validation dataset. 
+
+To prevent overfitting, one of the models includes regularization techniques. This can help to improve the model's generalization performance on new data. 
+
+Training losses and validation losses can be plotted over different periods to evaluate the performance of the models. This information can be used to optimize the models and improve their accuracy in predicting future trends.
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/InflationG.html" title="Inflation Plot"></iframe>
+```
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/InflationGL.html" title="Inflation Plot"></iframe>
+```
+
+
+As can be seen from the figure above, although regularization does not slow down the speed of loss reduction, it controls the inflection point value of loss, making it larger than the unregularized model.
+
+
+### Long Short Term Memory (LSTM)
+
+To address the problem that Recurrent Neural Networks (RNNs) can suffer from the problem of vanishing gradients, which can make it difficult to propagate information over long sequences, Long Short-Term Memory (LSTM) networks were introduced. LSTMs use three gates (i.e., the forget gate, the input gate, and the output gate) to regulate the flow of information in and out of cells, which can partially solve the problem of gradient disappearance.
+
+In the context of analyzing Inflation sequences, LSTM networks can be trained using the TensorFlow framework and Keras library. Two models can be constructed to analyze the effect of including regularization techniques on preventing overfitting.
+
+Training losses and validation losses can be plotted over different periods to evaluate the performance of the models. This information can be used to optimize the models and improve their accuracy in predicting future trends.
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/InflationM.html" title="Inflation Plot"></iframe>
+```
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/InflationML.html" title="Inflation Plot"></iframe>
+```
+
+
+It has the same regularization effect as the GRU model. As can be seen from the figure above, although regularization does not slow down the speed of loss reduction, it controls the inflection point value of loss, making it larger than the unregularized model.
+
+
+### Future Predictions
+
+After training the neural network models on the training data, the next step is to test the performance of the models on new data. The test data is used to make predictions, which are then compared and evaluated using each trained network. The results can be summarized in a table that includes the performance of each model.
+
+The table may include different categories for each Artificial Neural Network (ANN) model, such as regularized networks and unregularized networks. Regularization techniques can be used to prevent overfitting and improve the generalization performance of ANN models. Common regularization techniques include L1 and L2 regularization, dropout, and early stopping.
+
+The table can be used to compare the performance of different ANN models and identify the best performing model. The results can also be used to optimize the models and improve their accuracy in predicting future trends in the data.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+#| label: tbl-inflation
+#| tbl-cap: "Inflation Model Error Comparison"
+#| tbl-colwidths: [60,40]
+
+t <- read.csv('DeepLearning/Inflation.csv')
+
+library(knitr)
+kable(t)
+```
+
+Regularization decreased the training RMSEs for all models except for the LSTM model. And, the performance of the LSTM model was inferior to the other two models on both the training and test sets. This could be attributed to the fact that inflation is often subject to short-term control, which has a pronounced span of control effect. Consequently, inflation predictions may not rely as heavily on recent values as the LSTM model does.
+
+
+![](DeepLearning/Inflation.png)
+
+
+
+
+
+
+### Traditional vs. Deep Learning
+
+To facilitate a more visual and comparable comparison, I have compiled a table below summarizing the RMSEs of the traditional model and the three deep learning models with the best training performance.
+
+
+|     Type      |           Model         |       RMSE    |
+|---------------|:------------------------|--------------:|
+| Traditional   | ARIMA                   |         0.419 |
+| Traditional   | SARIMAX                 |      0.282104 |
+| Deep Learning | RNN with Regularization |     0.0466810 |
+| Deep Learning | GRU with Regularization |     0.0469885 |
+| Deep Learning | LSTM                    |     0.0625542 |
+
+: Inflation Traditional vs. Deep Learning Model Error Comparison
+
+
+The results are obvious. Even the deep learning model with the worst training performance has a significantly smaller RMSE than the best-performing traditional method. However, traditional models have the advantage of being able to produce easily interpretable formulas. In addition, SARIMAX models tend to have smaller errors than ARIMA models.
+
+
+## US CPI
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/CPI.html" title="CPI Plot"></iframe>
+```
+
+
+
+### Recurrent Neural Networks
+
+
+Recurrent Neural Networks (RNN) combine past predictions with current information to make predictions about future outputs. In the context of analyzing CPI time series data, a recursive neural network can be trained using the TensorFlow framework and Keras library. For example, a simple RNN model could consist of three hidden layers and a dense output layer that uses the hyperbolic tangent activation function.
+
+To prevent overfitting, a second model can be constructed using regularization techniques while keeping the other model parameters constant. The training process involves feeding the model with historical CPI data, and then testing the model's ability to predict future values using a validation dataset.
+
+Training losses and validation losses can be plotted over different periods to evaluate the performance of the model. This information can be used to optimize the model and improve its accuracy in predicting future trends.
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/CPIR.html" title="CPI Plot"></iframe>
+```
+
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/CPIRL.html" title="CPI Plot"></iframe>
+```
+
+
+There were no evident alterations in the two graphs, indicating that the model was most likely not overfitting. Therefore, no significant changes were made to the existing RNN model.
+
+
+### Gated Recurrent Unit (GRU)
+
+The Gated Recurrent Unit (GRU) neural network combines the functionality of the forgotten gate and the input gate into a single update gate, resulting in simpler cells than those of the Long Short-Term Memory (LSTM) network. Despite their simpler design, GRUs have been shown to achieve comparable accuracy to LSTMs. 
+
+To analyze the performance of GRUs on Inflation sequences, two models are constructed using the TensorFlow framework and Keras library. The training process involves feeding the models with historical Inflation data, and then testing their ability to predict future values using a validation dataset. 
+
+To prevent overfitting, one of the models includes regularization techniques. This can help to improve the model's generalization performance on new data. 
+
+Training losses and validation losses can be plotted over different periods to evaluate the performance of the models. This information can be used to optimize the models and improve their accuracy in predicting future trends.
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/CPIG.html" title="CPI Plot"></iframe>
+```
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/CPIGL.html" title="CPI Plot"></iframe>
+```
+
+
+It has the same regularization effect as the RNN model. There were no evident alterations in the two graphs, indicating that the model was most likely not overfitting. Therefore, no significant changes were made to the existing GRU model.
+
+
+### Long Short Term Memory (LSTM)
+
+To address the problem that Recurrent Neural Networks (RNNs) can suffer from the problem of vanishing gradients, which can make it difficult to propagate information over long sequences, Long Short-Term Memory (LSTM) networks were introduced. LSTMs use three gates (i.e., the forget gate, the input gate, and the output gate) to regulate the flow of information in and out of cells, which can partially solve the problem of gradient disappearance.
+
+In the context of analyzing Inflation sequences, LSTM networks can be trained using the TensorFlow framework and Keras library. Two models can be constructed to analyze the effect of including regularization techniques on preventing overfitting.
+
+Training losses and validation losses can be plotted over different periods to evaluate the performance of the models. This information can be used to optimize the models and improve their accuracy in predicting future trends.
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/CPIM.html" title="CPI Plot"></iframe>
+```
+
+```{=html}
+<iframe width="780" height="500" src="DeepLearning/CPIML.html" title="CPI Plot"></iframe>
+```
+
+
+Based on the plots above, it appears that regularization has a significant impact on reducing training loss at a faster rate. It would be intriguing to observe if this has any impact on the training and testing errors, which are displayed in the table below.
+
+
+### Future Predictions
+
+After training the neural network models on the training data, the next step is to test the performance of the models on new data. The test data is used to make predictions, which are then compared and evaluated using each trained network. The results can be summarized in a table that includes the performance of each model.
+
+The table may include different categories for each Artificial Neural Network (ANN) model, such as regularized networks and unregularized networks. Regularization techniques can be used to prevent overfitting and improve the generalization performance of ANN models. Common regularization techniques include L1 and L2 regularization, dropout, and early stopping.
+
+The table can be used to compare the performance of different ANN models and identify the best performing model. The results can also be used to optimize the models and improve their accuracy in predicting future trends in the data.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+#| label: tbl-cpi
+#| tbl-cap: "CPI Model Error Comparison"
+#| tbl-colwidths: [60,40]
+
+t <- read.csv('DeepLearning/CPI.csv')
+
+library(knitr)
+kable(t)
+```
+
+
+Interestingly, the LSTM model outperformed the other models in predicting CPI, which is in contrast to inflation. This could be due to the fact that CPI has an upward trend, and even though there may be occasional fluctuations, it tends to resume its upward trajectory.
+
+
+
+![](DeepLearning/CPI.png)
+
+
+
+
+### Traditional vs. Deep Learning
+
+
+The SARIMA model for CPI has an RMSE of approximately 0.568, which is significantly higher than any of the deep learning models, even when unregularized test RMSE. This may be due to the fact that the training requirements of traditional models are greater than the amount of CPI data available from the last 20 years. On the other hand, deep learning models have the potential to achieve greater accuracy even with small datasets. However, there is also a risk of overfitting, which can occur even with regularization.
+
+
+
+
+::: callout-note
+## CODE
+
+Please follow the provided link to access additional code
+
+[Click](https://github.com/ZIQIUSHAO/Inflation-Time-Series/blob/main/code/deeplearning.ipynb)
+:::
